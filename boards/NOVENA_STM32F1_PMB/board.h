@@ -50,7 +50,7 @@
 /*
  * MCU type as defined in the ST header file stm32f1xx.h.
  */
-#define STM32F10X_LD
+#define STM32F10X_MD
 
 /*
  * IO pins assignments.
@@ -211,8 +211,8 @@
         | PIN_MODE_FLOATING(PA10) \
         \
         /* GG_SYSPRES */ \
-        | PIN_OSPEED_INPUT(PA11) \
-        | PIN_MODE_INPUT(PA11) \
+        | PIN_OSPEED_2M(PA11) \
+        | PIN_OTYPE_PUSHPULL(PA11) \
         \
         /* CHG_CE */ \
         | PIN_OSPEED_INPUT(PA12) \
@@ -232,7 +232,8 @@
         \
         | 0)
 
-#define VAL_GPIOA_ODR 0
+/* Pull GG_SYSPRES high to enable gas gauge */
+#define VAL_GPIOA_ODR ( 1U << 11 )
 
 #define VAL_GPIOB_CRL   ( 0 \
         \

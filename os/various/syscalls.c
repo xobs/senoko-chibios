@@ -59,6 +59,17 @@
 #include <string.h>
 #include <sys/stat.h>
 #include <sys/types.h>
+#ifndef __errno_r
+/* This version of _reent is laid out with "int"s in pairs, to help
+ * ports with 16-bit int's but 32-bit pointers, align nicely.  */
+struct _reent
+{
+  /* As an exception to the above put _errno first for binary
+     compatibility with non _REENT_SMALL targets.  */
+  int _errno;                   /* local copy of errno */
+};
+#define __errno_r(reent) reent->_errno
+#endif
 
 #include "ch.h"
 #if defined(STDOUT_SD) || defined(STDIN_SD)
