@@ -232,8 +232,8 @@
         \
         | 0)
 
-/* Pull GG_SYSPRES high to enable gas gauge */
-#define VAL_GPIOA_ODR ( 1U << 11 )
+/* Pull GG_SYSPRES low to enable gas gauge */
+#define VAL_GPIOA_ODR ( 0U << 11 )
 
 #define VAL_GPIOB_CRL   ( 0 \
         \
@@ -290,12 +290,13 @@
         | PIN_MODE_INPUT(PB14) \
         \
         /* CHG_MASTERPWR */ \
-        | PIN_OSPEED_INPUT(PB15) \
-        | PIN_MODE_INPUT(PB15) \
+        | PIN_OSPEED_2M(PB15) \
+        | PIN_OTYPE_PUSHPULL(PB15) \
         \
         | 0 )
 
-#define VAL_GPIOB_ODR 0
+/* master power (PB15) on */
+#define VAL_GPIOB_ODR ((1U << 15))
 
 #define VAL_GPIOC_CRL   ( 0 \
         | PIN_NOTPRESENT(PC0) \

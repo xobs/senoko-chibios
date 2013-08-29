@@ -25,12 +25,12 @@
  */
 const PALConfig pal_default_config =
 {
-     /* ODR */      /* CRL */      /* CRH */
-  {VAL_GPIOA_ODR, VAL_GPIOA_CRL, VAL_GPIOA_CRH},
-  {VAL_GPIOB_ODR, VAL_GPIOB_CRL, VAL_GPIOB_CRH},
-  {VAL_GPIOC_ODR, VAL_GPIOC_CRL, VAL_GPIOC_CRH},
-  {VAL_GPIOD_ODR, VAL_GPIOD_CRL, VAL_GPIOD_CRH},
-  {VAL_GPIOE_ODR, VAL_GPIOE_CRL, VAL_GPIOE_CRH},
+	   /* ODR */      /* CRL */      /* CRH */
+	{VAL_GPIOA_ODR, VAL_GPIOA_CRL, VAL_GPIOA_CRH},
+	{VAL_GPIOB_ODR, VAL_GPIOB_CRL, VAL_GPIOB_CRH},
+	{VAL_GPIOC_ODR, VAL_GPIOC_CRL, VAL_GPIOC_CRH},
+	{VAL_GPIOD_ODR, VAL_GPIOD_CRL, VAL_GPIOD_CRH},
+	{VAL_GPIOE_ODR, VAL_GPIOE_CRL, VAL_GPIOE_CRH},
 };
 #endif
 
@@ -40,8 +40,7 @@ const PALConfig pal_default_config =
  *          and before any other initialization.
  */
 void __early_init(void) {
-
-  stm32_clock_init();
+	stm32_clock_init();
 }
 
 #if HAL_USE_SDC || defined(__DOXYGEN__)
@@ -49,20 +48,18 @@ void __early_init(void) {
  * @brief   SDC card detection.
  */
 bool_t sdc_lld_is_card_inserted(SDCDriver *sdcp) {
-
-  (void)sdcp;
-  /* TODO: Fill the implementation.*/
-  return TRUE;
+	(void)sdcp;
+	/* TODO: Fill the implementation.*/
+	return TRUE;
 }
 
 /**
  * @brief   SDC card write protection detection.
  */
 bool_t sdc_lld_is_write_protected(SDCDriver *sdcp) {
-
-  (void)sdcp;
-  /* TODO: Fill the implementation.*/
-  return FALSE;
+	(void)sdcp;
+	/* TODO: Fill the implementation.*/
+	return FALSE;
 }
 #endif /* HAL_USE_SDC */
 
@@ -71,20 +68,18 @@ bool_t sdc_lld_is_write_protected(SDCDriver *sdcp) {
  * @brief   MMC_SPI card detection.
  */
 bool_t mmc_lld_is_card_inserted(MMCDriver *mmcp) {
-
-  (void)mmcp;
-  /* TODO: Fill the implementation.*/
-  return TRUE;
+	(void)mmcp;
+	/* TODO: Fill the implementation.*/
+	return TRUE;
 }
 
 /**
  * @brief   MMC_SPI card write protection detection.
  */
 bool_t mmc_lld_is_write_protected(MMCDriver *mmcp) {
-
-  (void)mmcp;
-  /* TODO: Fill the implementation.*/
-  return FALSE;
+	(void)mmcp;
+	/* TODO: Fill the implementation.*/
+	return FALSE;
 }
 #endif
 
@@ -93,4 +88,6 @@ bool_t mmc_lld_is_write_protected(MMCDriver *mmcp) {
  * @todo    Add your board-specific code, if any.
  */
 void boardInit(void) {
+	/* Remap USART3, which allows PB10 and PB11 to act as I2C2 */
+	AFIO->MAPR |= AFIO_MAPR_USART3_REMAP_FULLREMAP;
 }
