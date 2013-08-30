@@ -33,12 +33,12 @@ void pmb_power_on(void) {
 	return;
 }
 
-void pmb_smbus_init(I2CDriver *driver) {
-	i2cInit();
+int pmb_smbus_init(I2CDriver *driver) {
 	i2cStart(driver, &i2cfg2);
-
-	chThdSleepMilliseconds(100);  /* Just to be safe. */
-
-	return;
+	return 0;
 }
 
+int pmb_smbus_deinit(I2CDriver *driver) {
+	i2cStop(driver);
+	return 0;
+}

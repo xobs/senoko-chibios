@@ -10,7 +10,7 @@ echo 149 > /sys/class/gpio/export 2> /dev/null
 echo out > /sys/class/gpio/gpio149/direction 2> /dev/null
 echo 1 > /sys/class/gpio/gpio149/value 2> /dev/null
 
-openocd -f interface/rlink.cfg -f ../../boards/NOVENA_STM32F1_PMB/openocd.cfg \
+openocd -f interface/jlink.cfg -f ../../boards/NOVENA_STM32F1_PMB/openocd.cfg \
             -c init -c targets -c halt \
             -c "flash write_image erase build/ch.elf" \
             -c "reset run"

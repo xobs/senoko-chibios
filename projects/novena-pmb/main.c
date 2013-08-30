@@ -24,18 +24,16 @@
 #include "pmb.h"
 #include "chprintf.h"
 
-int acks = 0;
-
 /* Devices on the bus:
  * 0x09 - Battery charger (bq24765)
  * 0x0d - Gas gauge (bq20z95dbt)
  * 0x48 - Voltage monitor (dac081c085)
  */
 uint8_t bus_devices[] = {
-	0x09,
-	0x0b,
-	0x0d,
-	0x48,
+	0x09,	/* Battery charger (BQ24765) */
+	0x0b,	/* Fuel gauge (BQ20Z95) */
+	0x0d,	/* Voltage monitor (DAC081C081) */
+	0x48,	/* ??? (Not a valid address) */
 };
 
 static const SerialConfig ser_cfg = {
@@ -75,7 +73,6 @@ static void restart(void *p) {
  */
 int main(void) {
 	int run;
-	int reg;
 	/*
 	 * System initializations.
 	 * - HAL initialization, this also initializes the configured device
@@ -95,46 +92,40 @@ int main(void) {
 	 */
 	sdStart(&SD1, &ser_cfg);
 
-	/*
-	 * Starts the transmission, it will be handled entirely in background.
-	 */
 	chprintf((BaseSequentialStream *)&SD1, "~Resetting~\r\n");
 	chThdSleepMilliseconds(10);
 
-	/*
-	 * Normal main() thread activity, in this demo it does nothing.
-	 */
 	run = 0;
-	reg = 0;
 	while (TRUE) {
-		int len = 0;
-		char output[32];
-		uint8_t msg[8];
+		uint8_t bfr[21];
+		int size;
+		uint8_t capacity;
+		uint16_t word;
+		int i;
 
-		run &= 0x3;
-		if (!run) {
-			reg++;
-			reg &= 0xff;
+		size = gg_partname(&I2CD2, bfr);
+		chprintf((BaseSequentialStream *)&SD1, "Part name (%d): %s\r\n", size, bfr);
+
+		size = gg_manuf(&I2CD2, bfr);
+		chprintf((BaseSequentialStream *)&SD1, "Manufacturer name (%d): %s\r\n", size, bfr);
+
+		size = gg_chem(&I2CD2, bfr);
+		chprintf((BaseSequentialStream *)&SD1, "Device chemistry (%d): %s\r\n", size, bfr);
+
+		size = gg_serial(&I2CD2, &word);
+		chprintf((BaseSequentialStream *)&SD1, "Device serial (%d): %04x\r\n", size, word);
+
+		size = gg_percent(&I2CD2, &capacity);
+		chprintf((BaseSequentialStream *)&SD1, "Battery charge (%d): %d%%\r\n", size, capacity);
+
+		for (i=1; i<=4; i++) {
+			size = gg_cellvoltage(&I2CD2, i, &word);
+			chprintf((BaseSequentialStream *)&SD1, "Cell %d voltage (%d): %d mV\r\n", i, size, word);
 		}
 
-		acks = gg_partname(&I2CD2, bus_devices[run], reg, msg);
-
-		if (acks == 0)
-			chprintf((BaseSequentialStream *)&SD1, "Hello: 0x%02x %02x 0x%08x [%c%c%c%c%c%c%c%c]\r\n",
-				bus_devices[run],
-				reg,
-				*((uint32_t *)msg),
-				msg[0],
-				msg[1],
-				msg[2],
-				msg[3],
-				msg[4],
-				msg[5],
-				msg[6],
-				msg[7]);
-		run++;
-
+			
 		chThdSleepMilliseconds(50);
+		run++;
 	}
 
 	return 0;
