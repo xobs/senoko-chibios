@@ -1,6 +1,11 @@
 /*
+<<<<<<< HEAD
     ChibiOS/RT - Copyright (C) 2006,2007,2008,2009,2010,
                  2011,2012,2013 Giovanni Di Sirio.
+=======
+    ChibiOS/RT - Copyright (C) 2006-2013 Giovanni Di Sirio
+    LPC122x EXT driver - Copyright (C) 2013 Marcin Jokel
+>>>>>>> f48d4bac4355916f56b531eb117f9732bbf9bb7b
 
     This file is part of ChibiOS/RT.
 

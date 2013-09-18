@@ -71,7 +71,123 @@
 *** Releases                                                              ***
 *****************************************************************************
 
+<<<<<<< HEAD
 *** 2.6.0 ***
+=======
+*** 2.7.0 ***
+- FIX: Fixed possible unalignment in GCC Cortex-M scatter files (bug #430)
+  (backported to 2.6.2 and 2.4.6).
+- FIX: Fixed PAL driver documentation error (bug #427)(backported to 2.6.1
+  and 2.4.5).
+- FIX: Fixed UART4 and 5 marked as not present in STM32F30x devices (bug #426)
+  (backported to 2.6.1).
+- FIX: Fixed warning in STM32 ICU/PWM drivers when used on STM32F3xx
+  (bug #425)(backported to 2.6.1).
+- FIX: Fixed conditional code error in STM32 PWM driver (bug #424)(backported
+  to 2.6.1).
+- FIX: Fixed error in Guards of pwm_lld.h from STM32 (bug #423)(backported to
+  2.6.1).
+- FIX: Fixed wrong RTC macro names in STM32L1xx HAL (bug #422)(backported to
+  2.6.1 and 2.4.5).
+- FIX: Fixed CodeSourcery personal version fails to build with undefined
+  errno_r (bug #421)(backported to 2.6.1).
+- FIX: Fixed FSMC reset on STM32F4xx (bug #420)(backported to 2.6.1 and 2.4.4).
+- FIX: Fixed invalid directory links in the demo files (bug #419)(backported
+  to 2.6.1).
+- FIX: Fixed missing casts in time-conversion macros (bug #418)(backported
+  to 2.6.1, 2.4.4 and 2.2.10).
+- FIX: Fixed PLL2 activation condition is wrong in STM32F107 HAL (bug #417)
+  (backported to 2.6.1 and 2.4.4).
+- FIX: Fixed STM32 Serial (v2) driver invalid CR registers size (bug #416)
+  (backported to 2.6.0).
+- FIX: Fixed MS2ST() and US2ST() macros error (bug #415)(backported to 2.6.0,
+  2.4.4, 2.2.10, NilRTOS).
+- NEW: Improvements to the STM32F4xx backup domain initialization.
+- NEW: Added initializer for the DIER register to the STM32 GPT, ICU and
+  PWM drivers.
+- NEW: Added support for 32bits counters to the STM32 GPT driver.
+- NEW: Added support for STM32F4xx backup RAM.
+- NEW: Added port support for SCP560B64.
+- NEW: Added DAC driver high level files and low level files templates.
+- NEW: Added support of UART4 and UART5 (STM32F4x and STM32F2x platforms)
+  (feature request #28).
+- NEW: SPI driver for SPC560Pxx, SPC563Mxx, SPC564Axx, SPC56ELAxx, SPC560Dxx.
+- NEW: Support for SPC560Dxx devices.
+- NEW: DMA-MUX support for SPC5xx devices.
+- CHANGE: Moved the STM32 GPT, ICU and PWM low level drivers under
+  ./os/hal/platform/STM32/TIMv1. Updated all the impacted project files.
+
+*** 2.5.2 ***
+- FIX: Fixed lwipthread.h should explicitly include lwip/opts.h (bug #414).
+- FIX: Fixed STM32_PLLI2SCLKOUT miscalculated (bug #413)(backported to 2.4.4).
+- FIX: Fixed wrong RTC vector name in STM32F1/F4/L1 EXT drivers (bug #412).
+- FIX: Fixed fill character error in chprintf (bug #411).
+- FIX: Fixed wrong STM32 USBv1 driver behavior (bug #410).
+- FIX: Fixed STM32 wrong peripherals reset procedure (bug #409)(backported
+  to 2.4.4).
+- FIX: Fixed STM32 SPIv2 polled exchange (bug #372).
+- FIX: Fixed wrong macro in PWM driver (bug #407)(backported to 2.4.4).
+- FIX: Fixed USB driver possible deadlock under certain configurations (bug
+  #406)(backported to 2.4.4).
+- FIX: Fixed USB driver cannot be stopped (bug #405)(backported to 2.4.4).
+- FIX: Fixed several spelling errors (bug #404).
+- FIX: Fixed serial port in STM32F3 discovery test case (bug #402).
+- FIX: Fixed add %i to chprintf (bug #401).
+- FIX: Fixed STM32F051 various (bug #400).
+- FIX: Fixed STM32F103 HSI configuration (bug #399).
+- FIX: Fixed patch to allow simulator to be restarted quicker (bug #398).
+- FIX: Fixed blkDisconnect macro typo (bug #397).
+- FIX: Fixed STM32 SPI (V2) driver hangs (bug 3608241).
+- FIX: Fixed fixed I2C malfunction after fixing bug 3607518 (bug 3607549)
+  (backported to 2.4.4).
+- FIX: Fixed spurious interrupt disabling an STM32 DMA stream (bug 3607518)
+  (backported to 2.4.4).
+- FIX: Fixed start of any ADC disables VREF and VBAT (bug 3607467)
+  (backported to 2.4.4).
+- FIX: Fixed surprising non-CRLF lines in source (bug 3607380).
+- FIX: Fixed no entry point defined at link time (bug 3607319).
+- FIX: Fixed sdc_lld_collect_errors does not collect errors (bug 3606743).
+- FIX: Fixed STM32 CAN broadcast typo (bug 3606675).
+- FIX: Fixed STM32 CAN mailbox receive for second fifo (bug 3606673).
+- FIX: Fixed CAN_USE_SLEEP_MODE compilation problem (bug 3606616)(backported
+  to 2.4.4)(backported to 2.2.10).
+- FIX: Fixed missing HSE bypass option for STM32F103 (bug 3606274).
+- FIX: Fixed misplaced brace in icu_lld.c (bug 3605832)(backported to 2.4.4).
+- FIX: Fixed errors in MMC_SPI driver state machine (bug 3605794).
+- FIX: Fixed deadlock in Serial_USB driver (bug 3605793).
+- FIX: Fixed compile Error OLIMEX_SAM7_EX256/board.c (bug 3605058).
+- FIX: Fixed bug prevents calling adcStartConversionI() within ISR (bug
+  3605053)(backported to 2.4.4).
+- FIX: Fixed typo in platforms/STM32/can_lld.c (bug 3604657)(backported
+  to 2.4.4).
+- FIX: Added board files and demo for "WaveShare Open STM32F4 207I-C / 407I-C".
+  Added ULPI support to the STM32 USB (OTG-HS) driver.
+  Contributed by Dave Camarillo (bug 3603362).
+- FIX: Fixed adcSTM32EnableTSVREFE must be called AFTER adcStart (bug
+  3602950).
+- FIX: Fixed duplicated code in hal_lld.h (STM32F4xx) (bug 3602544)
+  (backported to 2.4.4).
+- FIX: Fixed #define typo in usb_lld.h (OTGv1) (bug 3602306).
+- FIX: Fixed STM32F0 RCC enable/disable/reset functions for CRC and WWDG
+  (bug 3602150).
+- FIX: Fixed missing parenthesis in use of macro arguments (bug 3601638).
+- FIX: Fixed compile errors in Posix-GCC demo (bug 3601621)(backported
+  to 2.4.4).
+- FIX: Fixed state checker error in MSP430 port (bug 3601460)(backported
+  to 2.4.4).
+- FIX: Fixed wrong assertion in UART driver (bug 3600789)(backported
+  to 2.4.4).
+- FIX: Fixed small bug in shell argument parsing code in shell_thread (bug
+  3599328)(backported to 2.4.4).
+- FIX: Fixed wrong condition in checksum offload of STM32 MAC driver (bug
+  3598720)(backported to 2.4.4).
+- FIX: Fixed error in STM32 MAC driver degrades performance (bug 3598719)
+  (backported to 2.4.4).
+- FIX: Fixed warning in STM32 ICU driver using IAR compiler (bug 3598177)
+  (backported to 2.4.3).
+- FIX: Fixed wrong SPI path in platform_f105_f107.mk (bug 3598151).
+- FIX: Fixed PHY powerdown issues not fixed (bug 3596911).
+>>>>>>> f48d4bac4355916f56b531eb117f9732bbf9bb7b
 - NEW: Added new pwmIsChannelEnabledI() API to the PWM driver, implemented
   in the STM32 driver.
 - NEW: Added support for timers 6, 7, 9, 11, 12, 14 to the STM32 GPT driver.
