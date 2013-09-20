@@ -71,7 +71,6 @@ enum power_supply_property {
 	POWER_SUPPLY_PROP_SERIAL_NUMBER,
 };
 
-
 enum {
 	REG_MANUFACTURER_DATA,
 	REG_TEMPERATURE,

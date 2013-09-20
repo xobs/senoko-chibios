@@ -19,12 +19,21 @@
 #include <uart.h>
 #include <i2c.h>
 #include <stdio.h>
+#include <chprintf.h>
+#include <shell.h>
 
 #include "gg.h"
 #include "pmb.h"
-#include "chprintf.h"
 
-/* Devices on the bus:
+#define STREAM_SERIAL	(&SD1)
+#define STREAM		((BaseSequentialStream *)STREAM_SERIAL)
+#define SHELL_WA_SIZE	THD_WA_SIZE(2048)
+
+static void cmd_i2c(BaseSequentialStream *chp, int argc, char *argv[]);
+static void cmd_mode(BaseSequentialStream *chp, int argc, char *argv[]);
+
+/*
+ * Devices on the bus:
  * 0x09 - Battery charger (bq24765)
  * 0x0d - Gas gauge (bq20z95dbt)
  * 0x48 - Voltage monitor (dac081c085)
@@ -43,36 +52,39 @@ static const SerialConfig ser_cfg = {
 	0,
 };
 
+static const ShellCommand commands[] = {
+	{"i2c", cmd_i2c},
+	{"mode", cmd_mode},
+	{NULL, NULL} /* Sentinal */
+};
 
+static const ShellConfig shell_cfg = {
+	STREAM,
+	commands
+};
 
-#if 0
-static VirtualTimer vt1;
-
-static WORKING_AREA(PollBattThreadWA, 256);
-static msg_t PollBattThread(void *arg) {
-	chRegSetThreadName("PollBatt");
-	(void)arg;
-	while (TRUE) {
-		/*chThdSleepMilliseconds(rand() & 31);*/
-		chThdSleepMilliseconds(32);
-		//request_acceleration_data();
-	}
-	return 0;
+static void cmd_i2c(BaseSequentialStream *chp, int argc, char **argv) {
+	chprintf(chp, "~?\r\n");
+	chprintf(chp, "i2c(%d, %p)\r\n", argc, argv);
 }
 
-
-static void restart(void *p) {
-	(void)p;
-
+static void cmd_mode(BaseSequentialStream *chp, int argc, char **argv) {
+	chprintf(chp, "!%\r\n");
+	chprintf(chp, "mode(%d, %p)\r\n", argc, argv);
 }
-#endif
 
+int getVer(void) {
+	return 6;
+}
+
+static WORKING_AREA(shell_wa, SHELL_WA_SIZE);
 
 /*
  * Application entry point.
  */
 int main(void) {
-	int run;
+	Thread *shell_thr = NULL;
+
 	/*
 	 * System initializations.
 	 * - HAL initialization, this also initializes the configured device
@@ -82,19 +94,18 @@ int main(void) {
 	 */
 	halInit();
 	chSysInit();
+	shellInit();
 
 	pmb_smbus_init(&I2CD2);
 	gg_init(&I2CD2);
 	chThdSleepMilliseconds(200);
 
-	/*
-	 * Activates the serial driver 1 using the driver default configuration.
-	 */
-	sdStart(&SD1, &ser_cfg);
+	sdStart(STREAM_SERIAL, &ser_cfg);
 
-	chprintf((BaseSequentialStream *)&SD1, "~Resetting~\r\n");
+	chprintf(STREAM, "~Resetting (%d)~\r\n", getVer());
 	chThdSleepMilliseconds(10);
 
+	/*
 	run = 0;
 	while (TRUE) {
 		uint8_t bfr[21];
@@ -104,29 +115,42 @@ int main(void) {
 		int i;
 
 		size = gg_partname(&I2CD2, bfr);
-		chprintf((BaseSequentialStream *)&SD1, "Part name (%d): %s\r\n", size, bfr);
+		chprintf(STREAM, "Part name (%d): %s\r\n", size, bfr);
 
 		size = gg_manuf(&I2CD2, bfr);
-		chprintf((BaseSequentialStream *)&SD1, "Manufacturer name (%d): %s\r\n", size, bfr);
+		chprintf(STREAM, "Manufacturer name (%d): %s\r\n", size, bfr);
 
 		size = gg_chem(&I2CD2, bfr);
-		chprintf((BaseSequentialStream *)&SD1, "Device chemistry (%d): %s\r\n", size, bfr);
+		chprintf(STREAM, "Device chemistry (%d): %s\r\n", size, bfr);
 
 		size = gg_serial(&I2CD2, &word);
-		chprintf((BaseSequentialStream *)&SD1, "Device serial (%d): %04x\r\n", size, word);
+		chprintf(STREAM, "Device serial (%d): %04x\r\n", size, word);
 
 		size = gg_percent(&I2CD2, &capacity);
-		chprintf((BaseSequentialStream *)&SD1, "Battery charge (%d): %d%%\r\n", size, capacity);
+		chprintf(STREAM, "Battery charge (%d): %d%%\r\n", size, capacity);
 
 		for (i=1; i<=4; i++) {
 			size = gg_cellvoltage(&I2CD2, i, &word);
-			chprintf((BaseSequentialStream *)&SD1, "Cell %d voltage (%d): %d mV\r\n", i, size, word);
+			chprintf(STREAM, "Cell %d voltage (%d): %d mV\r\n", i, size, word);
 		}
 
-			
-		chThdSleepMilliseconds(50);
+		chThdSleepMilliseconds(500);
 		run++;
 	}
+	*/
+
+	while (1) {
+		if (!shell_thr)
+			shell_thr = shellCreateStatic(&shell_cfg, shell_wa, SHELL_WA_SIZE, NORMALPRIO);
+		else if (chThdTerminated(shell_thr)) {
+			chThdRelease(shell_thr);    /* Recovers memory of the previous shell.   */
+			shell_thr = NULL;           /* Triggers spawning of a new shell.        */
+			chprintf(STREAM, "\r\nShell exited...\r\n");
+			chThdSleepMilliseconds(50);
+		}
+		chThdSleepMilliseconds(50);
+	}
+
 
 	return 0;
 }

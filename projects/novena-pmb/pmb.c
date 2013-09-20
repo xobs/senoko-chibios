@@ -1,4 +1,3 @@
-
 #include <ch.h>
 #include <hal.h>
 #include <i2c.h>
@@ -9,14 +8,10 @@ static const I2CConfig i2cfg2 = {
 	STD_DUTY_CYCLE,
 };
 
-
 enum pmb_power_state {
 	pmb_state_power_off = 0,
 	pmb_state_power_on = 1,
 };
-
-
-
 
 static void pmb_set_power(enum pmb_power_state power_state) {
 	palWritePad(GPIOB, PB15, power_state);

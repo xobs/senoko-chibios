@@ -82,6 +82,9 @@ SECTIONS
         *(.note*)
     } > flash
 
+    /* ld.bfd will segfault without this */
+    .rel.plt : { . = .; } > flash
+
     .ARM.extab :
     {
         *(.ARM.extab* .gnu.linkonce.armextab.*)

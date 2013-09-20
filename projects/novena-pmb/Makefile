@@ -5,7 +5,7 @@
 
 # Compiler options here.
 ifeq ($(USE_OPT),)
-  USE_OPT = -Os -ggdb -fomit-frame-pointer -falign-functions=16
+  USE_OPT = -Os -fomit-frame-pointer
 endif
 
 # C specific options here (added to USE_OPT).
@@ -55,7 +55,7 @@ endif
 #
 
 # Define project name here
-PROJECT = ch
+PROJECT = pmb
 
 # Imported source files and paths
 CHIBIOS = ../..
@@ -64,7 +64,6 @@ include $(CHIBIOS)/os/hal/platforms/STM32F1xx/platform.mk
 include $(CHIBIOS)/os/hal/hal.mk
 include $(CHIBIOS)/os/ports/GCC/ARMCMx/STM32F1xx/port.mk
 include $(CHIBIOS)/os/kernel/kernel.mk
-include $(CHIBIOS)/test/test.mk
 
 # Define linker script file here
 LDSCRIPT= $(PORTLD)/STM32F101x8.ld
@@ -73,14 +72,14 @@ LDSCRIPT= $(PORTLD)/STM32F101x8.ld
 # setting.
 CSRC = $(PORTSRC) \
        $(KERNSRC) \
-       $(TESTSRC) \
        $(HALSRC) \
        $(PLATFORMSRC) \
        $(BOARDSRC) \
-       $(CHIBIOS)/os/various/evtimer.c \
-       $(CHIBIOS)/os/various/syscalls.c \
        $(CHIBIOS)/os/various/chprintf.c \
-       gg.c pmb.c \
+       kosagi_shell.c \
+       bionic.c \
+       gg.c \
+       pmb.c \
        main.c
 
 # C++ sources that can be compiled in ARM or THUMB mode depending on the global
@@ -124,11 +123,11 @@ INCDIR = $(PORTINC) $(KERNINC) $(TESTINC) \
 
 MCU  = cortex-m3
 
-#TRGT = arm-elf-
-#TRGT = arm-none-eabi-
 TRGT =
 CC   = $(TRGT)gcc
+#CC   = clang
 CPPC = $(TRGT)g++
+#CPPC = clang++
 # Enable loading with g++ only if you need C++ runtime support.
 # NOTE: You can use C++ even without C++ support if you are careful. C++
 #       runtime support makes code size explode.
