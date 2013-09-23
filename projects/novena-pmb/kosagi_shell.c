@@ -125,7 +125,6 @@ static msg_t shell_thread(void *p) {
   const ShellCommand *scp = ((ShellConfig *)p)->sc_commands;
   char *lp, *cmd, *tokp, line[SHELL_MAX_LINE_LENGTH];
   char *args[SHELL_MAX_ARGUMENTS + 1];
-  int i = 0;
 
   chRegSetThreadName("shell");
   chprintf(chp, "\r\nChibiOS/RT Shell\r\n");
