@@ -10,5 +10,17 @@ int gg_chem(struct I2CDriver *driver, uint8_t *chem);
 int gg_serial(struct I2CDriver *driver, void *serial);
 int gg_percent(struct I2CDriver *driver, void *capacity);
 int gg_cellvoltage(struct I2CDriver *driver, int cell, void *voltage);
+int gg_getmode(struct I2CDriver *driver, void *word);
+int gg_setprimary(struct I2CDriver *driver);
+int gg_setsecondary(struct I2CDriver *driver);
+int gg_temperature(struct I2CDriver *driver, int16_t *word);
+int gg_voltage(struct I2CDriver *driver, void *word);
+int gg_fullcapacity(struct I2CDriver *driver, int16_t *word);
+int gg_current(struct I2CDriver *driver, void *word);
+int gg_average_current(struct I2CDriver *driver, void *word);
+int gg_getstatus(struct I2CDriver *driver, void *word);
+int gg_getfirmwareversion(struct I2CDriver *driver, void *word);
+int gg_getstate(struct I2CDriver *driver, void *word);
+int gg_setleds(struct I2CDriver *driver, int state);
 
 #endif
