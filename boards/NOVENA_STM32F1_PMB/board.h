@@ -173,7 +173,7 @@
         \
         /* CHG_CRIT */ \
         | PIN_OSPEED_INPUT(PA0) \
-        | PIN_MODE_INPUT(PA0) \
+        | PIN_MODE_FLOATING(PA0) \
         \
         | PIN_UNUSED(PA1) \
         | PIN_UNUSED(PA2) \
@@ -200,7 +200,7 @@
 #define VAL_GPIOA_CRH   ( 0 \
         /* CHG_ACOK */ \
         | PIN_OSPEED_INPUT(PA8) \
-        | PIN_MODE_INPUT(PA8) \
+        | PIN_MODE_FLOATING(PA8) \
         \
         /* USART1_TX */ \
         | PIN_OSPEED_2M(PA9) \
@@ -216,7 +216,7 @@
         \
         /* CHG_CE */ \
         | PIN_OSPEED_INPUT(PA12) \
-        | PIN_MODE_INPUT(PA12) \
+        | PIN_MODE_FLOATING(PA12) \
         \
         /* JTMS-SWDIO */ \
         | PIN_OTYPE_PUSHPULL(PA13) \
@@ -239,7 +239,7 @@
         \
         /* CHG_ICOUT */ \
         | PIN_OSPEED_INPUT(PB0) \
-        | PIN_MODE_INPUT(PB0) \
+        | PIN_MODE_FLOATING(PB0) \
         \
         /* NC */ \
         | PIN_UNUSED(PB1) \
@@ -287,7 +287,7 @@
         \
         /* CHG_PWRSWITCH */ \
         | PIN_OSPEED_INPUT(PB14) \
-        | PIN_MODE_INPUT(PB14) \
+        | PIN_MODE_FLOATING(PB14) \
         \
         /* CHG_MASTERPWR */ \
         | PIN_OSPEED_2M(PB15) \
@@ -296,7 +296,8 @@
         | 0 )
 
 /* master power (PB15) on */
-#define VAL_GPIOB_ODR ((1U << 15))
+/* Pull alert (PB15) high */
+#define VAL_GPIOB_ODR ((1U << 15) | (1U << 12))
 
 #define VAL_GPIOC_CRL   ( 0 \
         | PIN_NOTPRESENT(PC0) \
