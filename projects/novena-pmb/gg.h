@@ -22,5 +22,11 @@ int gg_getstatus(struct I2CDriver *driver, void *word);
 int gg_getfirmwareversion(struct I2CDriver *driver, void *word);
 int gg_getstate(struct I2CDriver *driver, void *word);
 int gg_setleds(struct I2CDriver *driver, int state);
+int gg_calibrate(struct I2CDriver *driver);
+int gg_setchargecontrol(struct I2CDriver *driver, int state);
 
+int chg_set(struct I2CDriver *driver, uint32_t current,
+		uint32_t voltage, uint32_t input);
+int chg_getmanuf(struct I2CDriver *driver, uint16_t *word);
+int chg_getdevice(struct I2CDriver *driver, uint16_t *word);
 #endif

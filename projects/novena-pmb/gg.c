@@ -8,7 +8,72 @@
 #include "bionic.h"
 
 #define GG_ADDR 0xb
+#define CHG_ADDR 0x9
 #define I2C_TRIES 50
+
+#define gg_getmfgr_or_return(driver, bfr, data, size) \
+	do { \
+		int tries = I2C_TRIES; \
+		int ret = 0; \
+		while (tries-- > 0) { \
+			ret = gg_getmfgr_real(driver, bfr, data, size); \
+			if (ret < 0) \
+				return ret; \
+		} \
+	} while(0)
+
+#define chg_setblock_or_return(driver, data, size) \
+	do { \
+		int tries = I2C_TRIES; \
+		int ret = 0; \
+		while (tries-- > 0) { \
+			ret = chg_setblock(driver, data, size); \
+			if (ret < 0) \
+				return ret; \
+		} \
+	} while (0)
+
+#define chg_getblock_or_return(driver, reg, data, size) \
+	do { \
+		int tries = I2C_TRIES; \
+		int ret = 0; \
+		uint8_t _reg = reg; \
+		while (tries-- > 0) { \
+			msg_t status    = RDY_OK; \
+			/* SMBus times out after 25ms in hardware */ \
+			systime_t tmo   = TIME_INFINITE; \
+			i2caddr_t addr  = CHG_ADDR; \
+ \
+			pmb_smbus_init(driver); \
+			i2cAcquireBus(driver); \
+			status = i2cMasterTransmitTimeout(driver, addr, \
+							&_reg, sizeof(_reg), \
+							(void*)data, size, \
+							tmo); \
+			i2cReleaseBus(driver); \
+			pmb_smbus_deinit(driver); \
+ \
+			if (status == RDY_OK) \
+				break; \
+			if (status == RDY_TIMEOUT) \
+				ret = -1; \
+			else \
+				ret = i2cGetErrors(driver) | 0x80000000; \
+		} \
+		if (!tries) \
+			return ret; \
+	} while (0)
+
+#define gg_getblock_or_return(driver, bfr, data, size) \
+	do { \
+		int tries = I2C_TRIES; \
+		int ret = 0; \
+		while (tries-- > 0) { \
+			ret = gg_getblock_real(driver, bfr, data, size); \
+			if (ret < 0) \
+				return ret; \
+		} \
+	} while (0)
 
 enum power_supply_property {
 	/* Properties of type `int' */
@@ -211,19 +276,13 @@ static int gg_getmfgr_real(struct I2CDriver *driver, void *reg,
 
 static int gg_getmfgr(struct I2CDriver *driver, uint16_t reg,
 		void *data, int size) {
-	int tries = I2C_TRIES;
-	int ret = 0;
 	uint8_t bfr[3];
 	bfr[0] = 0;
 	bfr[1] = reg;
 	bfr[2] = reg>>8;
 
-	while (tries-- > 0) {
-		ret = gg_getmfgr_real(driver, bfr, data, size);
-		if (ret > 0)
-			return ret;
-	}
-	return ret;
+	gg_getmfgr_or_return(driver, bfr, data, size);
+	return 0;
 }
 
 static int gg_getblock_real(struct I2CDriver *driver, uint8_t reg,
@@ -263,6 +322,26 @@ static int gg_getblock(struct I2CDriver *driver, uint8_t reg,
 	return ret;
 }
 
+#if 0
+static int gg_getdataflash(struct I2CDriver *driver,
+		uint8_t subclass, uint8_t offset, void *data, uint8_t size) {
+	uint8_t bfr;
+	uint8_t *cdata = data;
+
+	bfr = 0x77; /* Set Subclass register */
+	gg_getblock_or_return(driver, bfr, NULL, 1);
+
+	while (size > 0) {
+		bfr++;
+		gg_getblock_or_return(driver, bfr, cdata, size>4?4:size);
+		size-=4;
+		cdata+=4;
+	}
+
+	return 0;
+}
+#endif
+
 static int gg_getword(struct I2CDriver *driver, uint8_t reg, void *word) {
 	return gg_getblock(driver, reg, word, 2);
 }
@@ -271,7 +350,6 @@ static int gg_getbyte(struct I2CDriver *driver, uint8_t reg, void *byte) {
 	return gg_getblock(driver, reg, byte, 1);
 }
 
-#define STREAM_SERIAL   (&SD1)
 static int gg_setblock_real(struct I2CDriver *driver, void *data, int size) {
 	msg_t status    = RDY_OK;
 	/* SMBus times out after 25ms in hardware */
@@ -315,6 +393,10 @@ static int gg_setblock(struct I2CDriver *driver, uint8_t reg,
 
 static int gg_setword(struct I2CDriver *driver, uint8_t reg, uint16_t word) {
 	return gg_setblock(driver, reg, &word, 2);
+}
+
+static int gg_setbyte(struct I2CDriver *driver, uint8_t reg, uint8_t word) {
+	return gg_setblock(driver, reg, &word, 1);
 }
 
 static int gg_getstring(struct I2CDriver *driver, uint8_t addr, uint8_t *data, int size) {
@@ -476,4 +558,83 @@ int gg_setleds(struct I2CDriver *driver, int state) {
 	default:
 		return gg_getmfgr(driver, 0x0034, NULL, 0);
 	}
+}
+
+int gg_calibrate(struct I2CDriver *driver) {
+	return gg_getmfgr(driver, 0x0040, NULL, 0);
+}
+
+int gg_setchargecontrol(struct I2CDriver *driver, int state) {
+	uint8_t reg;
+	int ret;
+	ret = gg_getbyte(driver, 0x03, &reg);
+	if (ret < 0)
+		return ret;
+	if (state == 0) /* Inverse logic */
+		reg |= 1<<6;
+	else
+		reg &= ~(1<<6);
+	return gg_setbyte(driver, 0x03, reg);
+}
+
+
+
+static int chg_setblock(struct I2CDriver *driver, void *data, int size) {
+	msg_t status    = RDY_OK;
+	/* SMBus times out after 25ms in hardware */
+	systime_t tmo   = TIME_INFINITE;
+	i2caddr_t addr  = CHG_ADDR;
+
+	pmb_smbus_init(driver);
+	i2cAcquireBus(driver);
+	status = i2cMasterTransmitTimeout(driver, addr,
+					data, size,
+					NULL, 0,
+					tmo);
+	i2cReleaseBus(driver);
+	pmb_smbus_deinit(driver);
+
+	if (status != RDY_OK) {
+		if (status == RDY_TIMEOUT)
+			return -1;
+		return i2cGetErrors(driver) | 0x80000000;
+	}
+
+	return size;
+}
+
+int chg_set(struct I2CDriver *driver, uint32_t current,
+		uint32_t voltage, uint32_t input) {
+	uint16_t val;
+	uint8_t bfr[3];
+
+	val = input;
+	bfr[0] = 0x3f;
+	bfr[1] = val;
+	bfr[2] = val>>8;
+	chg_setblock_or_return(driver, bfr, sizeof(bfr));
+
+	val = current;
+	bfr[0] = 0x14;
+	bfr[1] = val;
+	bfr[2] = val>>8;
+	chg_setblock_or_return(driver, bfr, sizeof(bfr));
+
+	val = voltage;
+	bfr[0] = 0x15;
+	bfr[1] = val;
+	bfr[2] = val>>8;
+	chg_setblock_or_return(driver, bfr, sizeof(bfr));
+
+	return 0;
+}
+
+int chg_getmanuf(struct I2CDriver *driver, uint16_t *word) {
+	chg_getblock_or_return(driver, 0xfe, word, 2);
+	return 0;
+}
+
+int chg_getdevice(struct I2CDriver *driver, uint16_t *word) {
+	chg_getblock_or_return(driver, 0xff, word, 2);
+	return 0;
 }
