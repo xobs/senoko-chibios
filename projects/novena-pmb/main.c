@@ -414,7 +414,6 @@ static void cmd_chg(BaseSequentialStream *chp, int argc, char **argv) {
 		chprintf(chp, "Error: 256 mA is the minimum charge current\r\n");
 		return;
 	}
-	current >>= 1; /* 0b00000001 is 2 mA */
 	current &= 0x1f80;
 
 	/* Figure/check voltage */
