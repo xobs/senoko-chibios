@@ -36,6 +36,7 @@
 
 #include <string.h>
 #include <errno.h>
+#include <stdint.h>
 #include "bionic.h"
 typedef unsigned char u_char;
 
@@ -325,3 +326,11 @@ unsigned long _strtoul(const char *nptr, char **endptr, int base)
 		*endptr = (char *) (any ? s - 1 : nptr);
 	return (acc);
 }
+
+void _memset(void *dst0, char val, size_t length)
+{
+	uint8_t *ptr = dst0;
+	while(length--)
+		*ptr++ = val;
+}
+

@@ -215,8 +215,8 @@
         | PIN_OTYPE_PUSHPULL(PA11) \
         \
         /* CHG_CE */ \
-        | PIN_OSPEED_INPUT(PA12) \
-        | PIN_MODE_FLOATING(PA12) \
+        | PIN_OSPEED_2M(PA12) \
+        | PIN_OTYPE_PUSHPULL(PA12) \
         \
         /* JTMS-SWDIO */ \
         | PIN_OTYPE_PUSHPULL(PA13) \
@@ -232,8 +232,11 @@
         \
         | 0)
 
-/* Pull GG_SYSPRES low to enable gas gauge */
-#define VAL_GPIOA_ODR ( 0U << 11 )
+/*
+ * Pull GG_SYSPRES low to enable gas gauge,
+ * and CHG_CE high to enable charging
+ */
+#define VAL_GPIOA_ODR (( 0U << 11 ) | ( 1U << 12 ))
 
 #define VAL_GPIOB_CRL   ( 0 \
         \

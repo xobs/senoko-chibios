@@ -5,7 +5,7 @@
 
 # Compiler options here.
 ifeq ($(USE_OPT),)
-  USE_OPT = -Os -fomit-frame-pointer
+  USE_OPT = -O2 -fomit-frame-pointer
 endif
 
 # C specific options here (added to USE_OPT).
@@ -78,7 +78,7 @@ CSRC = $(PORTSRC) \
        $(CHIBIOS)/os/various/chprintf.c \
        kosagi_shell.c \
        bionic.c \
-       gg.c \
+       gg.c chg.c \
        pmb.c \
        main.c
 

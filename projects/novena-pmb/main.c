@@ -23,6 +23,7 @@
 #include <shell.h>
 
 #include "gg.h"
+#include "chg.h"
 #include "pmb.h"
 #include "bionic.h"
 
@@ -42,6 +43,9 @@ static void cmd_stats(BaseSequentialStream *chp, int argc, char **argv);
 static void cmd_leds(BaseSequentialStream *chp, int argc, char **argv);
 static void cmd_gg(BaseSequentialStream *chp, int argc, char **argv);
 static void cmd_chg(BaseSequentialStream *chp, int argc, char **argv);
+static void cmd_setmanuf(BaseSequentialStream *chp, int argc, char **argv);
+static void cmd_setpuv(BaseSequentialStream *chp, int argc, char **argv);
+static void cmd_setchem(BaseSequentialStream *chp, int argc, char **argv);
 
 static char *permafailures[] = {
 	"fuse is blown",
@@ -98,13 +102,86 @@ static const ShellCommand commands[] = {
 	{"leds",	cmd_leds},
 	{"gg",		cmd_gg},
 	{"chg",		cmd_chg},
+	{"setchem",	cmd_setchem},
+	{"setmanuf",	cmd_setmanuf},
+	{"setpuv",	cmd_setpuv},
 	{NULL,		NULL} /* Sentinal */
 };
+
+
+/* Directly maps to Gas Gauge flash state Offset 82 */
+struct gg_state {
+	uint16_t qmax_cell_0; /* Measured in mAh */
+	uint16_t qmax_cell_1; /* Measured in mAh */
+	uint16_t qmax_cell_2; /* Measured in mAh */
+	uint16_t qmax_cell_3; /* Measured in mAh */
+	uint16_t qmax_pack;   /* Measured in mAh */
+	uint16_t reserved1;	/* Offset 11 */
+	uint8_t  update_status; /* Offset 12 */
+	uint8_t  reserved2[8];
+	int16_t  avg_i_last_run;
+	int16_t  avg_p_last_run;
+	int16_t  delta_voltage;
+} __attribute__((__packed__));
+
+
+/* Directly maps to Gas Gauge flash Power Offset 68 */
+struct gg_power {
+	uint16_t flash_update_ok_voltage; /* mV */
+	uint16_t shutdown_voltage; /* mV */
+	uint8_t  shutdown_time; /* Seconds */
+	uint16_t shutdown_voltage_cell0; /* mV */
+	uint16_t thing;
+} __attribute__((__packed__));
+
+struct gg_config {
+	uint16_t cfg_a;
+	uint16_t cfg_b;
+	uint16_t cfg_c;
+	uint16_t permfail_cfg;
+	uint16_t nonremove_cfg;
+} __attribute__((__packed__));
 
 static const ShellConfig shell_cfg = {
 	STREAM,
 	commands
 };
+
+static inline int _isprint(char c) {
+	return c>32 && c<128;
+}
+
+int print_hex_offset(BaseSequentialStream *chp, uint8_t *block, int count, int offset) {
+    int byte;
+    count += offset;
+    block -= offset;
+    for ( ; offset<count; offset+=16) {
+        chprintf(chp, "%08x ", offset);
+
+        for (byte=0; byte<16; byte++) {
+            if (byte == 8)
+                chprintf(chp, " ");
+            if (offset+byte < count)
+                chprintf(chp, " %02x", block[offset+byte]&0xff);
+            else
+                chprintf(chp, "   ");
+        }
+
+        chprintf(chp, "  |");
+        for (byte=0; byte<16 && byte+offset<count; byte++)
+            chprintf(chp, "%c", _isprint(block[offset+byte]) ?
+                                    block[offset+byte] :
+                                    '.');
+        chprintf(chp, "|\r\n");
+    }
+    return 0;
+}
+
+int print_hex(BaseSequentialStream *chp, uint8_t *block, int count) {
+    return print_hex_offset(chp, block, count, 0);
+}
+
+
 
 static void cmd_i2c(BaseSequentialStream *chp, int argc, char **argv) {
 	chprintf(chp, "i2c(%d, %p)\r\n", argc, argv);
@@ -154,13 +231,11 @@ static void cmd_dac(BaseSequentialStream *chp, int argc, char **argv) {
 	(void)argc;
 	(void)argv;
 
-	pmb_smbus_init(driver);
 	i2cAcquireBus(driver);
 	status = i2cMasterReceiveTimeout(driver, DAC_ADDR,
 			(void *)&result, sizeof(result),
 			timeout);
 	i2cReleaseBus(driver);
-	pmb_smbus_deinit(driver);
 
 	if (status != RDY_OK) {
 		if (status == RDY_TIMEOUT)
@@ -351,15 +426,52 @@ static void cmd_gg(BaseSequentialStream *chp, int argc, char **argv) {
 	int state;
 	int ret;
 
-	if (argc == 1 && argv[0][0] == '+')
-		state = 1;
-	else if (argc == 1 && argv[0][0] == '-')
-		state = 0;
+	if (argc == 1 && (argv[0][0] == '+' || argv[0][0] == '-')) {
+		if (argv[0][0] == '+')
+			state = 1;
+		else
+			state = 0;
+		/*
+		chprintf(chp, "Going to %sable charge control\r\n", state>0?"EN":"DIS");
+		ret = gg_setchargecontrol(I2C_BUS, state);
+		if (ret < 0)
+			chprintf(chp, "Unable to set charge control: 0x%x\r\n", ret);
+		chprintf(chp, "Charge control %sabled\r\n", state>0?"EN":"DIS");
+		*/
+		chprintf(chp, "Going to %sable discharge FET\r\n", state>0?"EN":"DIS");
+		ret = gg_forcedsg(I2C_BUS, state);
+		if (ret < 0)
+			chprintf(chp, "Unable to set FET: %d\r\n", ret);
+	}
 	else if (argc == 1 && !_strcasecmp(argv[0], "cal")) {
 		chprintf(chp, "Calibrating... ");
 		gg_calibrate(I2C_BUS);
 		chprintf(chp, "Requested\r\n");
 		return;
+	}
+	else if (!_strcasecmp(argv[0], "cells")) {
+		if (argc == 1) {
+		}
+		else {
+			if (argv[1][0] == '3') {
+				ret = gg_setcells(I2C_BUS, 3);
+				if (ret < 0)
+					chprintf(chp, "Unable to set 3 cells: 0x%x\r\n", ret);
+				else
+					chprintf(chp, "Set 3-cell mode\r\n");
+			}
+			else if (argv[1][0] == '4') {
+				ret = gg_setcells(I2C_BUS, 4);
+				if (ret < 0)
+					chprintf(chp, "Unable to set 4 cells: 0x%x\r\n", ret);
+				else
+					chprintf(chp, "Set 4-cell mode\r\n");
+			}
+			else {
+				chprintf(chp, "Unknown cell count: %c\r\n",
+						argv[1][0]);
+			}
+		}
 	}
 	else {
 		chprintf(chp,
@@ -367,19 +479,74 @@ static void cmd_gg(BaseSequentialStream *chp, int argc, char **argv) {
 		return;
 	}
 
-	ret = gg_setchargecontrol(I2C_BUS, state);
-	if (ret < 0)
-		chprintf(chp, "Unable to set charge control: 0x%x\r\n", ret);
-	else
-		chprintf(chp, "Charge control %sabled\r\n", state>0?"EN":"DIS");
+}
+
+static void cmd_setpuv(BaseSequentialStream *chp, int argc, char **argv) {
+	uint16_t volts;
+	if (argc != 1) {
+		chprintf(chp,
+		"Usage: setpuv [mV] to set Power UnderVoltage threshhold\r\n");
+		return;
+	}
+	volts = _strtoul(argv[0], NULL, 0);
+	gg_setpuvthresh(I2C_BUS, volts);
+}
+
+static void cmd_setchem(BaseSequentialStream *chp, int argc, char **argv) {
+	uint8_t buf[4];
+	unsigned int i;
+
+	if (argc != 1) {
+		chprintf(chp, "Usage: setchem [chemistry]\r\n");
+		return;
+	}
+
+	/* XXX HACK TO GET FLASH VOLTAGE HIGH */
+	/*
+	palWritePad(GPIOA, PA12, 1);
+	chThdSleepMilliseconds(25);
+	chg_set(I2C_BUS, 1000, 12600, 2000>>1);
+	chThdSleepMilliseconds(25);
+	*/
+
+	_memset(buf, 0, sizeof(buf));
+	for (i=0; i<sizeof(buf) && argv[0][i]; i++)
+		buf[i] = argv[0][i];
+	gg_setchem(I2C_BUS, buf);
+
+	//chg_set(I2C_BUS, 0, 0, 0);
+	//palWritePad(GPIOA, PA12, 0);
+}
+
+static void cmd_setmanuf(BaseSequentialStream *chp, int argc, char **argv) {
+	uint8_t manuf[11];
+	unsigned int i;
+	int ret;
+	if (argc != 1) {
+		chprintf(chp, "Usage: setmanuf [manufacturer]\r\n");
+		return;
+	}
+
+	_memset(manuf, 0, sizeof(manuf));
+	for (i=0; i<sizeof(manuf) && argv[0][i]; i++)
+		manuf[i] = argv[0][i];
+
+	ret = gg_setmanuf(I2C_BUS, manuf);
+	if (ret) {
+		chprintf(chp, "Unable to set manufacturer: 0x%x\r\n", ret);
+		return;
+	}
+
+	chprintf(chp, "Manufacturer set\r\n");
+	return;
 }
 
 static void cmd_chg(BaseSequentialStream *chp, int argc, char **argv) {
-	uint32_t current, voltage, input;
 	int ret;
 
 	if (argc == 0) {
 		uint16_t word = 0;
+		uint16_t current, voltage, input;
 		chprintf(chp, "Usage: chg [current] [voltage] [[input]]\r\n");
 		chprintf(chp, "\tCurrent is measured in mA, voltage in mV\r\n");
 
@@ -390,6 +557,10 @@ static void cmd_chg(BaseSequentialStream *chp, int argc, char **argv) {
 
 		chg_getdevice(I2C_BUS, &word);
 		chprintf(chp, "\tChager device ID: 0x%04x\r\n", word);
+
+		ret = chg_get(I2C_BUS, &current, &voltage, &input);
+		chprintf(chp, "Charger state: %dmA @ %dmV (input: %dmA)\r\n",
+				current, voltage, input<<1);
 		return;
 	}
 
@@ -399,55 +570,66 @@ static void cmd_chg(BaseSequentialStream *chp, int argc, char **argv) {
 		return;
 	}
 
-	input = 1024; /* mA */
-	current = _strtoul(argv[0], NULL, 0);
-	voltage = _strtoul(argv[1], NULL, 0);
-	if (argc > 2)
-		input = _strtoul(argv[2], NULL, 0);
+	if (argc == 2 && argv[1][0] == '+') {
+		chprintf(chp, "Enabling CHG_CE\r\n");
+		palWritePad(GPIOA, PA12, 1);
+	}
+	else if (argc == 2 && argv[1][0] == '-') {
+		chprintf(chp, "Disabling CHG_CE\r\n");
+		palWritePad(GPIOA, PA12, 0);
+	}
+	else {
+		uint32_t current, voltage, input;
+		input = 1024; /* mA */
+		current = _strtoul(argv[0], NULL, 0);
+		voltage = _strtoul(argv[1], NULL, 0);
+		if (argc > 2)
+			input = _strtoul(argv[2], NULL, 0);
 
-	/* Figure/check current */
-	if (current > 4096) {
-		chprintf(chp, "Error: That's too much current\r\n");
-		return;
-	}
-	if (current < 256) {
-		chprintf(chp, "Error: 256 mA is the minimum charge current\r\n");
-		return;
-	}
-	current &= 0x1f80;
+		/* Figure/check current */
+		if (current > 4096) {
+			chprintf(chp, "Error: That's too much current\r\n");
+			return;
+		}
+		if (current < 256) {
+			chprintf(chp, "Error: 256 mA is the minimum charge current\r\n");
+			return;
+		}
+		current &= 0x1f80;
 
-	/* Figure/check voltage */
-	if (voltage > 16384) {
-		chprintf(chp, "Error: That's an awful lot of voltage\r\n");
-		return;
-	}
+		/* Figure/check voltage */
+		if (voltage > 16384) {
+			chprintf(chp, "Error: That's an awful lot of voltage\r\n");
+			return;
+		}
 
-	if (voltage < 1024) {
-		chprintf(chp, "Error: Too little voltage (1024 mV min)\r\n");
-		return;
-	}
-	voltage &= 0x7ff0;
+		if (voltage < 1024) {
+			chprintf(chp, "Error: Too little voltage (1024 mV min)\r\n");
+			return;
+		}
+		voltage &= 0x7ff0;
 
-	/* Figure/check input current */
-	if (input > 11004) {
-		chprintf(chp,
-		"Error: 11004 mA is the max supported input current\r\n");
-		return;
-	}
-	if (input < 256) {
-		chprintf(chp, "Error: Input current must be at least 256 mA\r\n");
-		return;
-	}
-	input >>= 1; /* 0b00000001 is 2 mA */
-	input &= 0x1f80;
+		/* Figure/check input current */
+		if (input > 11004) {
+			chprintf(chp,
+			"Error: 11004 mA is the max supported input current\r\n");
+			return;
+		}
+		if (input < 256) {
+			chprintf(chp, "Error: Input current must be at least 256 mA\r\n");
+			return;
+		}
+		input >>= 1; /* 0b00000001 is 2 mA */
+		input &= 0x1f80;
 
-	chprintf(chp, "Setting charger: %dmA @ %dmV (input: %dmA)... ",
-			current<<1, voltage, input<<1);
-	ret = chg_set(I2C_BUS, current, voltage, input);
-	if (ret < 0)
-		chprintf(chp, "Error: 0x%x\r\n", ret);
-	else
-		chprintf(chp, "Ok\r\n");
+		chprintf(chp, "Setting charger: %dmA @ %dmV (input: %dmA)... ",
+				current, voltage, input<<1);
+		ret = chg_set(I2C_BUS, current, voltage, input);
+		if (ret < 0)
+			chprintf(chp, "Error: 0x%x\r\n", ret);
+		else
+			chprintf(chp, "Ok\r\n");
+	}
 
 	return;
 }
