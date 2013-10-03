@@ -16,89 +16,6 @@
 /* SMBus times out after 25ms in hardware */
 static systime_t tmo   = TIME_INFINITE;
 
-enum power_supply_property {
-	/* Properties of type `int' */
-	POWER_SUPPLY_PROP_STATUS = 0,
-	POWER_SUPPLY_PROP_CHARGE_TYPE,
-	POWER_SUPPLY_PROP_HEALTH,
-	POWER_SUPPLY_PROP_PRESENT,
-	POWER_SUPPLY_PROP_ONLINE,
-	POWER_SUPPLY_PROP_AUTHENTIC,
-	POWER_SUPPLY_PROP_TECHNOLOGY,
-	POWER_SUPPLY_PROP_CYCLE_COUNT,
-	POWER_SUPPLY_PROP_VOLTAGE_MAX,
-	POWER_SUPPLY_PROP_VOLTAGE_MIN,
-	POWER_SUPPLY_PROP_VOLTAGE_MAX_DESIGN,
-	POWER_SUPPLY_PROP_VOLTAGE_MIN_DESIGN,
-	POWER_SUPPLY_PROP_VOLTAGE_NOW,
-	POWER_SUPPLY_PROP_VOLTAGE_AVG,
-	POWER_SUPPLY_PROP_VOLTAGE_OCV,
-	POWER_SUPPLY_PROP_CURRENT_MAX,
-	POWER_SUPPLY_PROP_CURRENT_NOW,
-	POWER_SUPPLY_PROP_CURRENT_AVG,
-	POWER_SUPPLY_PROP_POWER_NOW,
-	POWER_SUPPLY_PROP_POWER_AVG,
-	POWER_SUPPLY_PROP_CHARGE_FULL_DESIGN,
-	POWER_SUPPLY_PROP_CHARGE_EMPTY_DESIGN,
-	POWER_SUPPLY_PROP_CHARGE_FULL,
-	POWER_SUPPLY_PROP_CHARGE_EMPTY,
-	POWER_SUPPLY_PROP_CHARGE_NOW,
-	POWER_SUPPLY_PROP_CHARGE_AVG,
-	POWER_SUPPLY_PROP_CHARGE_COUNTER,
-	POWER_SUPPLY_PROP_CONSTANT_CHARGE_CURRENT,
-	POWER_SUPPLY_PROP_CONSTANT_CHARGE_CURRENT_MAX,
-	POWER_SUPPLY_PROP_CONSTANT_CHARGE_VOLTAGE,
-	POWER_SUPPLY_PROP_CONSTANT_CHARGE_VOLTAGE_MAX,
-	POWER_SUPPLY_PROP_CHARGE_CONTROL_LIMIT,
-	POWER_SUPPLY_PROP_CHARGE_CONTROL_LIMIT_MAX,
-	POWER_SUPPLY_PROP_ENERGY_FULL_DESIGN,
-	POWER_SUPPLY_PROP_ENERGY_EMPTY_DESIGN,
-	POWER_SUPPLY_PROP_ENERGY_FULL,
-	POWER_SUPPLY_PROP_ENERGY_EMPTY,
-	POWER_SUPPLY_PROP_ENERGY_NOW,
-	POWER_SUPPLY_PROP_ENERGY_AVG,
-	POWER_SUPPLY_PROP_CAPACITY, /* in percents! */
-	POWER_SUPPLY_PROP_CAPACITY_ALERT_MIN, /* in percents! */
-	POWER_SUPPLY_PROP_CAPACITY_ALERT_MAX, /* in percents! */
-	POWER_SUPPLY_PROP_CAPACITY_LEVEL,
-	POWER_SUPPLY_PROP_TEMP,
-	POWER_SUPPLY_PROP_TEMP_ALERT_MIN,
-	POWER_SUPPLY_PROP_TEMP_ALERT_MAX,
-	POWER_SUPPLY_PROP_TEMP_AMBIENT,
-	POWER_SUPPLY_PROP_TEMP_AMBIENT_ALERT_MIN,
-	POWER_SUPPLY_PROP_TEMP_AMBIENT_ALERT_MAX,
-	POWER_SUPPLY_PROP_TIME_TO_EMPTY_NOW,
-	POWER_SUPPLY_PROP_TIME_TO_EMPTY_AVG,
-	POWER_SUPPLY_PROP_TIME_TO_FULL_NOW,
-	POWER_SUPPLY_PROP_TIME_TO_FULL_AVG,
-	POWER_SUPPLY_PROP_TYPE, /* use power_supply.type instead */
-	POWER_SUPPLY_PROP_SCOPE,
-	/* Properties of type `const char *' */
-	POWER_SUPPLY_PROP_MODEL_NAME,
-	POWER_SUPPLY_PROP_MANUFACTURER,
-	POWER_SUPPLY_PROP_SERIAL_NUMBER,
-};
-
-enum {
-	REG_MANUFACTURER_DATA,
-	REG_TEMPERATURE,
-	REG_VOLTAGE,
-	REG_CURRENT,
-	REG_CAPACITY,
-	REG_TIME_TO_EMPTY,
-	REG_TIME_TO_FULL,
-	REG_STATUS,
-	REG_CYCLE_COUNT,
-	REG_SERIAL_NUMBER,
-	REG_REMAINING_CAPACITY,
-	REG_REMAINING_CAPACITY_CHARGE,
-	REG_FULL_CHARGE_CAPACITY,
-	REG_FULL_CHARGE_CAPACITY_CHARGE,
-	REG_DESIGN_CAPACITY,
-	REG_DESIGN_CAPACITY_CHARGE,
-	REG_DESIGN_VOLTAGE,
-};
-
 static struct cell_cfg {
 	uint16_t pov_threshold;
 	uint16_t pov_recovery;
@@ -157,74 +74,7 @@ static struct cell_cfg {
 	},
 };
 
-/* Battery Mode defines */
-#define BATTERY_MODE_OFFSET             0x03
-#define BATTERY_MODE_MASK               0x8000
-enum sbs_battery_mode {
-        BATTERY_MODE_AMPS,
-        BATTERY_MODE_WATTS
-};
-
-/* manufacturer access defines */
-#define MANUFACTURER_ACCESS_STATUS      0x0006
-#define MANUFACTURER_ACCESS_SLEEP       0x0011
-
-/* battery status value bits */
-#define BATTERY_DISCHARGING             0x40
-#define BATTERY_FULL_CHARGED            0x20
-#define BATTERY_FULL_DISCHARGED         0x10
-
-#define SBS_DATA(_psp, _addr, _min_value, _max_value) { \
-	.psp = _psp, \
-	.addr = _addr, \
-	.min_value = _min_value, \
-	.max_value = _max_value, \
-}
-
-static const struct chip_data {
-	enum power_supply_property psp;
-	uint8_t addr;
-	int min_value;
-	int max_value;
-} sbs_data[] = {
-	[REG_MANUFACTURER_DATA] =
-		SBS_DATA(POWER_SUPPLY_PROP_PRESENT, 0x00, 0, 65535),
-	[REG_TEMPERATURE] =
-		SBS_DATA(POWER_SUPPLY_PROP_TEMP, 0x08, 0, 65535),
-	[REG_VOLTAGE] =
-		SBS_DATA(POWER_SUPPLY_PROP_VOLTAGE_NOW, 0x09, 0, 20000),
-	[REG_CURRENT] =
-		SBS_DATA(POWER_SUPPLY_PROP_CURRENT_NOW, 0x0A, -32768, 32767),
-	[REG_CAPACITY] =
-		SBS_DATA(POWER_SUPPLY_PROP_CAPACITY, 0x0D, 0, 100),
-	[REG_REMAINING_CAPACITY] =
-		SBS_DATA(POWER_SUPPLY_PROP_ENERGY_NOW, 0x0F, 0, 65535),
-	[REG_REMAINING_CAPACITY_CHARGE] =
-		SBS_DATA(POWER_SUPPLY_PROP_CHARGE_NOW, 0x0F, 0, 65535),
-	[REG_FULL_CHARGE_CAPACITY] =
-		SBS_DATA(POWER_SUPPLY_PROP_ENERGY_FULL, 0x10, 0, 65535),
-	[REG_FULL_CHARGE_CAPACITY_CHARGE] =
-		SBS_DATA(POWER_SUPPLY_PROP_CHARGE_FULL, 0x10, 0, 65535),
-	[REG_TIME_TO_EMPTY] =
-		SBS_DATA(POWER_SUPPLY_PROP_TIME_TO_EMPTY_AVG, 0x12, 0, 65535),
-	[REG_TIME_TO_FULL] =
-		SBS_DATA(POWER_SUPPLY_PROP_TIME_TO_FULL_AVG, 0x13, 0, 65535),
-	[REG_STATUS] =
-		SBS_DATA(POWER_SUPPLY_PROP_STATUS, 0x16, 0, 65535),
-	[REG_CYCLE_COUNT] =
-		SBS_DATA(POWER_SUPPLY_PROP_CYCLE_COUNT, 0x17, 0, 65535),
-	[REG_DESIGN_CAPACITY] =
-		SBS_DATA(POWER_SUPPLY_PROP_ENERGY_FULL_DESIGN, 0x18, 0, 65535),
-	[REG_DESIGN_CAPACITY_CHARGE] =
-		SBS_DATA(POWER_SUPPLY_PROP_CHARGE_FULL_DESIGN, 0x18, 0, 65535),
-	[REG_DESIGN_VOLTAGE] =
-		SBS_DATA(POWER_SUPPLY_PROP_VOLTAGE_MAX_DESIGN, 0x19, 0, 65535),
-	[REG_SERIAL_NUMBER] =
-		SBS_DATA(POWER_SUPPLY_PROP_SERIAL_NUMBER, 0x1C, 0, 65535),
-};
-
-
-static uint8_t subclass_size[] = {
+static const uint8_t subclass_size[] = {
 	[0] = 22,
 	[1] = 25,
 	[2] = 10,
@@ -279,12 +129,10 @@ static uint8_t subclass_size[] = {
 	[107] = 3,
 };
 
-struct gg_string {
+static const struct gg_string {
 	uint8_t size;
 	uint8_t reg;
-};
-
-static const struct gg_string gg_strings[] = {
+} gg_strings[] = {
 	{
 		.size = 12,
 		.reg  = 0x20,
@@ -326,6 +174,8 @@ static int gg_getmfgr(struct I2CDriver *driver, uint16_t reg,
 {
 	msg_t status;
 	uint8_t bfr[3];
+	uint8_t *data8 = data;
+	uint8_t tmp;
 
 	bfr[0] = 0;
 	bfr[1] = reg;
@@ -349,6 +199,12 @@ static int gg_getmfgr(struct I2CDriver *driver, uint16_t reg,
 		if (status == RDY_TIMEOUT)
 			return -1;
 		return i2cGetErrors(driver) | 0x80000000;
+	}
+
+	if (data && size == 2) {
+		tmp = data8[0];
+		data8[0] = data8[1];
+		data8[1] = tmp;
 	}
 	return 0;
 }
@@ -374,7 +230,7 @@ static int gg_getblock(struct I2CDriver *driver, uint8_t reg,
 	return 0;
 }
 
-int gg_getdataflash(struct I2CDriver *driver,
+int gg_getflash(struct I2CDriver *driver,
 		uint8_t subclass, uint8_t offset, void *data, int size) {
 	msg_t status;
 	uint8_t bfr[3];
@@ -396,10 +252,12 @@ int gg_getdataflash(struct I2CDriver *driver,
 					bfr, sizeof(bfr),
 					NULL, 0,
 					tmo);
-	if (status != RDY_OK)
+	if (status != RDY_OK) {
+		status = -1;
 		goto err;
+	}
 
-	reg = (offset/32)+0x78;
+	reg = (offset / 32) + 0x78;
 	while (size > 0) {
 		/*
 		 * If we're starting at a non-divisible offset,
@@ -424,7 +282,7 @@ int gg_getdataflash(struct I2CDriver *driver,
 
 			to_read = 33;
 			if (size < 32)
-				to_read = size+1;
+				to_read = size + 1;
 
 			status = i2cMasterTransmitTimeout(driver, GG_ADDR,
 							&reg, sizeof(reg),
@@ -435,8 +293,10 @@ int gg_getdataflash(struct I2CDriver *driver,
 			size  -= 32;
 			cdata += 32;
 		}
-		if (status != RDY_OK)
+		if (status != RDY_OK) {
+			status = -2;
 			goto err;
+		}
 		reg++;
 	}
 
@@ -448,7 +308,7 @@ err:
 	return status;
 }
 
-int gg_setdataflash(struct I2CDriver *driver,
+int gg_setflash(struct I2CDriver *driver,
 		uint8_t subclass, uint8_t offset, void *data, int size) {
 	msg_t status;
 	uint8_t bfr[3];
@@ -458,31 +318,42 @@ int gg_setdataflash(struct I2CDriver *driver,
 	int end = (32*((offset+size)/32) + 32*(!!(offset+size)))/32;
 	uint8_t eeprom_cache[256];
 
-	if ((offset + size > subclass_size[subclass]) || size <= 0)
+	if ((offset + size > subclass_size[subclass]) || size <= 0) {
+		//chprintf(STREAM, "Size (%d) + offset (%d) > subclass size (%d)\r\n",
+		//		size, offset, subclass_size[subclass]);
 		return -1;
-
-	chThdSleepMilliseconds(50);
-	ret = gg_getdataflash(driver, subclass, 0,
-			eeprom_cache, subclass_size[subclass]);
-	if (ret < 0) {
-		chprintf(STREAM, "Unable to read subclass %d: %d\r\n", subclass, i2cGetErrors(driver));
-		return ret;
 	}
 
+	chThdSleepMilliseconds(50);
+	ret = gg_getflash(driver, subclass, 0,
+			eeprom_cache, subclass_size[subclass]);
+	if (ret < 0) {
+		//chprintf(STREAM, "Unable to read subclass %d: %d\r\n",
+		//		subclass, i2cGetErrors(driver));
+		return -2;
+	}
+
+	//chprintf(STREAM, "Original flash:\r\n");
+	//print_hex(STREAM, eeprom_cache, subclass_size[subclass]);
 	_memcpy(eeprom_cache + offset, data, size);
+	//chprintf(STREAM, "New flash:\r\n");
+	//print_hex(STREAM, eeprom_cache, subclass_size[subclass]);
+
+	chThdSleepMilliseconds(25);
 
 	i2cAcquireBus(driver);
 
 	bfr[0] = 0x77; /* SetSubclassID register */
 	bfr[1] = subclass;
 	bfr[2] = subclass>>8;
-
 	status = i2cMasterTransmitTimeout(driver, GG_ADDR,
 					bfr, sizeof(bfr),
 					NULL, 0,
 					tmo);
 	if (status < 0) {
-		chprintf(STREAM, "Unable to set subclass %d: %d\r\n", subclass, i2cGetErrors(driver));
+		//chprintf(STREAM, "Unable to set subclass %d: %d\r\n",
+		//		subclass, i2cGetErrors(driver));
+		status = -3;
 		goto err;
 	}
 
@@ -505,12 +376,16 @@ int gg_setdataflash(struct I2CDriver *driver,
 		_memcpy(temp_buffer + 2,
 			eeprom_cache + (32 * ptr),
 			write_size - 2);
+
+		//chprintf(STREAM, "Writing flash data:\r\n");
+		//print_hex(STREAM, temp_buffer, write_size);
 		status = i2cMasterTransmitTimeout(driver, GG_ADDR,
 					temp_buffer, write_size,
 					NULL, 0,
 					tmo);
 		if (status != RDY_OK) {
-			chprintf(STREAM, "Unable to update page 0x%x (subclass %d, offset %d): %d\r\n", temp_buffer[0], subclass, offset, i2cGetErrors(driver));
+			//chprintf(STREAM, "Unable to update page 0x%x (subclass %d, offset %d): %d\r\n", temp_buffer[0], subclass, offset, i2cGetErrors(driver));
+			status = -4;
 			goto err;
 		}
 
@@ -526,18 +401,30 @@ err:
 	return status;
 }
 
+int gg_setflash_word(struct I2CDriver *driver,
+		uint8_t subclass, uint8_t offset, uint16_t data) {
+	uint16_t val;
+	val = ((data >> 8) & 0xff) | ((data << 8) & 0xff00);
+	return gg_setflash(driver, subclass, offset, &val, 2);
+}
+
+int gg_getflash_word(struct I2CDriver *driver,
+		uint8_t subclass, uint8_t offset, uint16_t *data) {
+	int ret;
+	ret = gg_getflash(driver, subclass, offset, data, 2);
+	if (ret < 0)
+		return ret;
+	*data = ((*data >> 8) & 0xff) | ((*data << 8) & 0xff00);
+	return 0;
+}
+
+
 int gg_setmanuf(struct I2CDriver *driver, uint8_t name[11]) {
-	return gg_setdataflash(driver, 48, 26 + 1, name, 11);
+	return gg_setflash(driver, 48, 26 + 1, name, 11);
 }
 
 int gg_setchem(struct I2CDriver *driver, uint8_t chem[4]) {
-        return gg_setdataflash(driver, 48, 46 + 1, chem, 4);
-}
-
-int gg_setpuvthresh(struct I2CDriver *driver, uint16_t puv) {
-	if (puv > 16000)
-		return -1;
-	return gg_setdataflash(driver, 0, 17, &puv, sizeof(puv));
+        return gg_setflash(driver, 48, 46 + 1, chem, 4);
 }
 
 int gg_setcells(struct I2CDriver *driver, int cells) {
@@ -549,7 +436,7 @@ int gg_setcells(struct I2CDriver *driver, int cells) {
 
 	/* Set the number of cells */
 
-	ret = gg_getdataflash(driver, 64, 0, cfg_a, sizeof(cfg_a));
+	ret = gg_getflash(driver, 64, 0, cfg_a, sizeof(cfg_a));
 	if (ret < 0)
 		return ret;
 
@@ -564,57 +451,57 @@ int gg_setcells(struct I2CDriver *driver, int cells) {
 	else
 		return -1;
 
-	ret = gg_setdataflash(driver, 64, 0, cfg_a, sizeof(cfg_a));
+	ret = gg_setflash(driver, 64, 0, cfg_a, sizeof(cfg_a));
 	if (ret < 0)
 		return ret;
 
 	/* Set various over/undervoltage flags */
-
-	ret = gg_setdataflash(driver, 0, 7, &cell_cfgs[cells].pov_threshold, 2);
-	if (ret < 0)
-		return ret;
-
-	ret = gg_setdataflash(driver, 0, 10, &cell_cfgs[cells].pov_recovery, 2);
+	
+	ret = gg_setflash_word(driver, 0, 7, cell_cfgs[cells].pov_threshold);
 	if (ret < 0)
 		return ret;
 
-	ret = gg_setdataflash(driver, 0, 17, &cell_cfgs[cells].puv_threshold, 2);
+	ret = gg_setflash_word(driver, 0, 10, cell_cfgs[cells].pov_recovery);
 	if (ret < 0)
 		return ret;
 
-	ret = gg_setdataflash(driver, 0, 20, &cell_cfgs[cells].puv_recovery, 2);
+	ret = gg_setflash_word(driver, 0, 17, cell_cfgs[cells].puv_threshold);
 	if (ret < 0)
 		return ret;
 
-	ret = gg_setdataflash(driver, 16, 0, &cell_cfgs[cells].sov_threshold, 2);
+	ret = gg_setflash_word(driver, 0, 20, cell_cfgs[cells].puv_recovery);
+	if (ret < 0)
+		return ret;
+
+	ret = gg_setflash_word(driver, 16, 0, cell_cfgs[cells].sov_threshold);
 	if (ret < 0)
 		return ret;
 	
-	ret = gg_setdataflash(driver, 34, 2, &cell_cfgs[cells].charging_voltage, 2);
+	ret = gg_setflash_word(driver, 34, 2, cell_cfgs[cells].charging_voltage);
 	if (ret < 0)
 		return ret;
 	
-	ret = gg_setdataflash(driver, 38, 8, &cell_cfgs[cells].depleted_voltage, 2);
+	ret = gg_setflash_word(driver, 38, 8, cell_cfgs[cells].depleted_voltage);
 	if (ret < 0)
 		return ret;
 	
-	ret = gg_setdataflash(driver, 38, 11, &cell_cfgs[cells].depleted_recovery, 2);
+	ret = gg_setflash_word(driver, 38, 11, cell_cfgs[cells].depleted_recovery);
 	if (ret < 0)
 		return ret;
 	
-	ret = gg_setdataflash(driver, 48, 8, &cell_cfgs[cells].design_voltage, 2);
+	ret = gg_setflash_word(driver, 48, 8, cell_cfgs[cells].design_voltage);
 	if (ret < 0)
 		return ret;
 	
-	ret = gg_setdataflash(driver, 68, 0, &cell_cfgs[cells].flash_update_ok_voltage, 2);
+	ret = gg_setflash_word(driver, 68, 0, cell_cfgs[cells].flash_update_ok_voltage);
 	if (ret < 0)
 		return ret;
 	
-	ret = gg_setdataflash(driver, 68, 2, &cell_cfgs[cells].shutdown_voltage, 2);
+	ret = gg_setflash_word(driver, 68, 2, cell_cfgs[cells].shutdown_voltage);
 	if (ret < 0)
 		return ret;
 	
-	ret = gg_setdataflash(driver, 80, 45, &cell_cfgs[cells].term_voltage, 2);
+	ret = gg_setflash_word(driver, 80, 45, cell_cfgs[cells].term_voltage);
 	if (ret < 0)
 		return ret;
 
@@ -622,7 +509,7 @@ int gg_setcells(struct I2CDriver *driver, int cells) {
 }
 
 
-static int gg_getword(struct I2CDriver *driver, uint8_t reg, void *word) {
+int gg_getword(struct I2CDriver *driver, uint8_t reg, void *word) {
 	return gg_getblock(driver, reg, word, 2);
 }
 
@@ -636,7 +523,8 @@ static int gg_setblock(struct I2CDriver *driver, uint8_t reg,
 	msg_t status;
 
 	bfr[0] = reg;
-	_memcpy(bfr+1, data, size);
+	if (data && size)
+		_memcpy(bfr+1, data, size);
 
 	i2cAcquireBus(driver);
 	status = i2cMasterTransmitTimeout(driver, GG_ADDR,
@@ -654,9 +542,15 @@ static int gg_setword(struct I2CDriver *driver, uint8_t reg, uint16_t word) {
 	return gg_setblock(driver, reg, &word, 2);
 }
 
+/*
 static int gg_setbyte(struct I2CDriver *driver, uint8_t reg, uint8_t byte) {
 	return gg_setblock(driver, reg, &byte, 1);
 }
+
+static int gg_setnull(struct I2CDriver *driver, uint8_t reg) {
+	return gg_setblock(driver, reg, NULL, 0);
+}
+*/
 
 static int gg_getstring(struct I2CDriver *driver, uint8_t addr,
 			uint8_t *data, int size) {
@@ -676,29 +570,6 @@ static int gg_getstring(struct I2CDriver *driver, uint8_t addr,
 	return size;
 }
 
-/**
- *
- */
-int gg_refresh(struct I2CDriver *driver, int property) {
-	uint16_t result = 0;
-	uint16_t addr   = property;
-	msg_t status    = RDY_OK;
-	systime_t tmo   = MS2ST(4);
-
-	i2cAcquireBus(driver);
-	status = i2cMasterTransmitTimeout(driver, GG_ADDR,
-					(void *)&addr, sizeof(addr),
-					(void *)&result, sizeof(result),
-					tmo);
-	i2cReleaseBus(driver);
-
-	if (status != RDY_OK){
-		return i2cGetErrors(driver) | 0x80000000;
-	}
-
-	return result & 0x0000ffff;
-}
-
 int gg_manuf(struct I2CDriver *driver, uint8_t *manuf) {
 	return gg_getstring(driver, gg_strings[0].reg, manuf, gg_strings[0].size);
 }
@@ -712,11 +583,11 @@ int gg_chem(struct I2CDriver *driver, uint8_t *chem) {
 }
 
 int gg_serial(struct I2CDriver *driver, void *serial) {
-	return gg_getword(driver, sbs_data[REG_SERIAL_NUMBER].addr, serial);
+	return gg_getword(driver, 0x1c, serial);
 }
 
 int gg_percent(struct I2CDriver *driver, uint8_t *capacity) {
-	return gg_getbyte(driver, sbs_data[REG_CAPACITY].addr, capacity);
+	return gg_getbyte(driver, 0x0f, capacity);
 }
 
 int gg_cellvoltage(struct I2CDriver *driver, int cell, void *voltage) {
@@ -727,58 +598,105 @@ int gg_cellvoltage(struct I2CDriver *driver, int cell, void *voltage) {
 	return gg_getword(driver, 0x3c+cell, voltage);
 }
 
+int gg_setcapacity(struct I2CDriver *driver, int cells, uint16_t capacity) {
+	int cell;
+	int ret;
+
+	if (cells < 2 || cells > 4)
+		return 1;
+
+	/* Set capacity of known cells */
+	for (cell=0; cell < cells; cell++) {
+		if (cell < cells)
+			ret = gg_setflash_word(driver, 82, cell*2, capacity);
+		else
+			/* Set other capacities to 0 */
+			ret = gg_setflash_word(driver, 82, cell*2, 0);
+		if (ret < 0)
+			return ret;
+	}
+
+	/* Set Qmax Pack */
+	ret = gg_setflash_word(driver, 82, 8, capacity);
+	if (ret < 0)
+		return ret;
+
+	/* Set the SBS value */
+	ret = gg_setflash_word(driver, 48, 22, capacity);
+	if (ret < 0)
+		return ret;
+
+	/* Set tracking support */
+	uint8_t reg;
+	reg = 0x03;
+	ret = gg_setflash(driver, 82, 12, &reg, 1);
+	if (ret < 0)
+		return ret;
+
+	return 0;
+}
+
+
 int gg_getmode(struct I2CDriver *driver, void *word) {
-	return gg_getword(driver, BATTERY_MODE_OFFSET, word);
+	return gg_getword(driver, 0x03, word);
 }
 
 int gg_setprimary(struct I2CDriver *driver) {
-	uint16_t word;
+	uint8_t reg[2];
 	int ret;
-	ret = gg_getmode(driver, &word);
+	ret = gg_getmode(driver, reg);
 	if (ret < 0)
 		return ret;
-	word |= (1<<9);
-	return gg_setword(driver, BATTERY_MODE_OFFSET, word);
+	reg[0] |= (1<<1);
+	return gg_setblock(driver, 0x03, reg, 2);
 }
 
 int gg_setsecondary(struct I2CDriver *driver) {
-	uint16_t word;
+	uint8_t reg[2];
 	int ret;
-	ret = gg_getmode(driver, &word);
+	ret = gg_getmode(driver, reg);
 	if (ret < 0)
 		return ret;
-	word &= ~(1<<9);
-	return gg_setword(driver, BATTERY_MODE_OFFSET, word);
+	reg[0] &= ~(1<<1);
+	return gg_setblock(driver, 0x03, reg, 2);
 }
 
 int gg_temperature(struct I2CDriver *driver, int16_t *word) {
 	int16_t *temp = word;
 	int ret;
-	ret = gg_getword(driver, sbs_data[REG_TEMPERATURE].addr, temp);
+	ret = gg_getword(driver, 0x08, temp);
 	if (ret < 0)
 		return ret;
 	*temp = *temp - 2730;
 	return 0;
 }
 
+int gg_timetofull(struct I2CDriver *driver, uint16_t *minutes) {
+	return gg_getword(driver, 0x13, minutes);
+}
+
 int gg_voltage(struct I2CDriver *driver, void *word) {
-	return gg_getword(driver, sbs_data[REG_VOLTAGE].addr, word);
+	return gg_getword(driver, 0x09, word);
 }
 
 int gg_current(struct I2CDriver *driver, void *word) {
-	int ret;
-	ret = gg_getword(driver, sbs_data[REG_CURRENT].addr, word);
-	if (ret < 0)
-		return ret;
-	return 0;
+	return gg_getword(driver, 0x0a, word);
+}
+
+int gg_charging_current(struct I2CDriver *driver, void *word) {
+	return gg_getword(driver, 0x14, word);
+}
+
+int gg_charging_voltage(struct I2CDriver *driver, void *word) {
+	return gg_getword(driver, 0x15, word);
 }
 
 int gg_fullcapacity(struct I2CDriver *driver, int16_t *word) {
-	int ret;
-	ret = gg_getword(driver, sbs_data[REG_FULL_CHARGE_CAPACITY].addr, word);
-	if (ret < 0)
-		return ret;
-	return 0;
+	return gg_getword(driver, 0x10, word);
+}
+
+int gg_designcapacity(struct I2CDriver *driver, int16_t *word) {
+	return gg_getword(driver, 0x18, word);
 }
 
 int gg_average_current(struct I2CDriver *driver, void *word) {
@@ -790,7 +708,7 @@ int gg_average_current(struct I2CDriver *driver, void *word) {
 }
 
 int gg_getstatus(struct I2CDriver *driver, void *word) {
-	return gg_getword(driver, sbs_data[REG_STATUS].addr, word);
+	return gg_getword(driver, 0x16, word);
 }
 
 int gg_getfirmwareversion(struct I2CDriver *driver, void *word) {
@@ -798,7 +716,11 @@ int gg_getfirmwareversion(struct I2CDriver *driver, void *word) {
 }
 
 int gg_getstate(struct I2CDriver *driver, void *word) {
-	return gg_getmfgr(driver, 0x0006, word, 2);
+	int ret;
+	ret = gg_getmfgr(driver, 0x0006, word, 2);
+	if (ret < 0)
+		return ret;
+	return 0;
 }
 
 int gg_setleds(struct I2CDriver *driver, int state) {
@@ -812,21 +734,97 @@ int gg_setleds(struct I2CDriver *driver, int state) {
 	}
 }
 
-int gg_calibrate(struct I2CDriver *driver) {
-	return gg_getmfgr(driver, 0x0040, NULL, 0);
+int gg_setitenable(struct I2CDriver *driver) {
+	return gg_getmfgr(driver, 0x0021, NULL, 0);
 }
 
-int gg_setchargecontrol(struct I2CDriver *driver, int state) {
-	uint8_t reg;
+#if 0
+int gg_calibrate(struct I2CDriver *driver,
+		int16_t voltage, int16_t current,
+		uint16_t temperature, int cells) {
 	int ret;
-	ret = gg_getbyte(driver, 0x03, &reg);
+	ret = gg_getmfgr(driver, 0x0040, NULL, 0);
+	if (ret < 0)
+		return ret;
+
+	ret = gg_setword(driver, 0x63, cells);
+	if (ret < 0) {
+		chprintf(STREAM, "Unable to set number of cells\r\n");
+		goto out;
+	}
+
+	ret = gg_setword(driver, 0x60, current);
+	if (ret < 0) {
+		chprintf(STREAM, "Unable to set current\r\n");
+		goto out;
+	}
+
+	ret = gg_setword(driver, 0x61, voltage);
+	if (ret < 0) {
+		chprintf(STREAM, "Unable to set voltage\r\n");
+		goto out;
+	}
+
+	ret = gg_setword(driver, 0x62, temperature);
+	if (ret < 0) {
+		chprintf(STREAM, "Unable to set temperature\r\n");
+		goto out;
+	}
+
+	/* Start calibration */
+	ret = gg_setword(driver, 0x51, 0xc0d5);
+	int tries;
+	for (tries=0; tries<10; tries++) {
+		uint16_t val;
+		chThdSleepMilliseconds(200);
+		ret = gg_getword(driver, 0x52, &val);
+		if (ret < 0) {
+			chprintf(STREAM, "Unable to query: %d\r\n", ret);
+			continue;
+		}
+		chprintf(STREAM, "Val: 0x%x\r\n", val);
+		if (val & 0x3fff)
+			break;
+	}
+
+	/* Write results to flash */
+
+
+	return gg_setnull(driver, 0x73);
+
+out:
+	gg_setnull(driver, 0x73);
+	return ret;
+}
+#endif
+
+int gg_setchargecontrol(struct I2CDriver *driver, int state) {
+	uint8_t reg[2];
+	int ret;
+
+	/* Disable the feature in flash, if necessary */
+	ret = gg_getflash(driver, 64, 2, reg, 2);
+	if (ret < 0)
+		return ret;
+
+	if (reg[1] & 1) {
+		reg[1] &= ~1;
+		ret = gg_setflash(driver, 64, 2, reg, 2);
+	}
+
+	/* Turn on charge control */
+	ret = gg_getblock(driver, 0x03, reg, 2);
 	if (ret < 0)
 		return ret;
 	if (state == 0) /* Inverse logic */
-		reg |= 1<<6;
+		reg[0] |= 1<<6;
 	else
-		reg &= ~(1<<6);
-	return gg_setbyte(driver, 0x03, reg);
+		reg[0] &= ~(1<<6);
+	ret = gg_setblock(driver, 0x03, reg, 2);
+	if (ret < 0)
+		return ret;
+
+	return ret;
 }
 
 int gg_forcedsg(struct I2CDriver *driver, int state) {
@@ -841,4 +839,3 @@ int gg_forcedsg(struct I2CDriver *driver, int state) {
 		val &= ~(1<<1);
 	return gg_setword(driver, 0x46, val);
 }
-

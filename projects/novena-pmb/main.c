@@ -44,7 +44,6 @@ static void cmd_leds(BaseSequentialStream *chp, int argc, char **argv);
 static void cmd_gg(BaseSequentialStream *chp, int argc, char **argv);
 static void cmd_chg(BaseSequentialStream *chp, int argc, char **argv);
 static void cmd_setmanuf(BaseSequentialStream *chp, int argc, char **argv);
-static void cmd_setpuv(BaseSequentialStream *chp, int argc, char **argv);
 static void cmd_setchem(BaseSequentialStream *chp, int argc, char **argv);
 
 static char *permafailures[] = {
@@ -104,7 +103,6 @@ static const ShellCommand commands[] = {
 	{"chg",		cmd_chg},
 	{"setchem",	cmd_setchem},
 	{"setmanuf",	cmd_setmanuf},
-	{"setpuv",	cmd_setpuv},
 	{NULL,		NULL} /* Sentinal */
 };
 
@@ -184,11 +182,29 @@ int print_hex(BaseSequentialStream *chp, uint8_t *block, int count) {
 
 
 static void cmd_i2c(BaseSequentialStream *chp, int argc, char **argv) {
-	chprintf(chp, "i2c(%d, %p)\r\n", argc, argv);
+	uint16_t val;
+	uint8_t *ptr;
+	uint8_t reg;
+	int ret;
+
+	ptr = (uint8_t *)&val;
+	if (argc != 1) {
+		chprintf(chp, "Usage: i2c [address] to get gas gauge\r\n");
+		return;
+	}
+	extern int gg_getword(struct I2CDriver *driver, uint8_t reg, void *word);
+
+	reg = _strtoul(argv[0], NULL, 0);
+	ret = gg_getword(I2C_BUS, reg, &val);
+	if (ret < 0) {
+		chprintf(chp, "Unable to get register: 0x%x\r\n", ret);
+		return;
+	}
+	chprintf(chp, "Register 0x%02x: 0x%04x (%02x %02x)\r\n", reg, val, ptr[0], ptr[1]);
+	return;
 }
 
 static void cmd_mode(BaseSequentialStream *chp, int argc, char **argv) {
-//	chprintf(chp, "argc: %d  argv[0]: %s  argv[0][0]: %c\n", argc, argv[0], argv[0]?argv[0][0]:'.');
 	if (argc == 1 && argv[0] && argv[0][0] == 'p') {
 		chprintf(chp, "Setting primary mode...");
 		gg_setprimary(I2C_BUS);
@@ -200,25 +216,25 @@ static void cmd_mode(BaseSequentialStream *chp, int argc, char **argv) {
 		chprintf(chp, " Set\r\n");
 	}
 	else {
-		uint16_t mode;
-		gg_getmode(I2C_BUS, &mode);
+		uint8_t mode[2];
+		gg_getmode(I2C_BUS, mode);
 		chprintf(chp, "Current mode:\r\n");
 		chprintf(chp, "\tInternal charge controller%s supported\r\n",
-				mode&(1<<0)?"":" NOT");
-		chprintf(chp, "\tPrimary battery%s supported\r\n",
-				mode&(1<<1)?"":" NOT");
-		if (mode&(1<<7))
+				mode[1] & (1<<0)?"":" NOT");
+		chprintf(chp, "\tPrimary battery support%s supported\r\n",
+				mode[1] & (1<<1)?"":" NOT");
+		if (mode[1] & (1<<7))
 			chprintf(chp, "\tConditioning cycle requested\r\n");
 		chprintf(chp, "\tInternal charge control %sabled\r\n",
-				mode&(1<<8)?"EN":"DIS");
+				mode[0] & (1<<0)?"EN":"DIS");
 		chprintf(chp, "\t%s battery\r\n",
-				mode&(1<<9)?"Primary":"Secondary");
+				mode[0] & (1<<1)?"Primary":"Secondary");
 		chprintf(chp, "\tAlarm broadcasts %sabled\r\n",
-				mode&(1<<13)?"DIS":"EN");
+				mode[0] & (1<<5)?"DIS":"EN");
 		chprintf(chp, "\tCharge broadcasts %sabled\r\n",
-				mode&(1<<14)?"DIS":"EN");
+				mode[0] & (1<<6)?"DIS":"EN");
 		chprintf(chp, "\tCapacity measured in %s\r\n",
-				mode&(1<<15)?"10 mW":"mA");
+				mode[0] & (1<<7)?"10 mW":"mA");
 	}
 	return;
 }
@@ -252,7 +268,9 @@ static void cmd_dac(BaseSequentialStream *chp, int argc, char **argv) {
 
 static void cmd_stats(BaseSequentialStream *chp, int argc, char **argv) {
 	uint8_t str[16];
+	uint8_t stats[2];
 	int16_t word = 0;
+	uint16_t minutes;
 	uint8_t byte = 0;
 	void *driver = I2C_BUS;
 	int cell;
@@ -278,37 +296,43 @@ static void cmd_stats(BaseSequentialStream *chp, int argc, char **argv) {
 	else
 		chprintf(chp, "Firmware ver:       0x%04x\r\n", word);
 
-	ret = gg_getstate(driver, &word);
+	ret = gg_getstate(driver, stats);
 	if (ret < 0)
 		chprintf(chp, "State:              error 0x%x\r\n", ret);
 	else {
 		int chgfet, dsgfet;
-		switch (word&0xc000) {
-		case 0x0000:
+		switch (stats[0]) {
+		case 0x00:
 			chgfet = 1;
 			dsgfet = 1;
 			break;
-		case 0x4000:
+		case 0x40:
 			chgfet = 0;
 			dsgfet = 1;
 			break;
-		case 0x8000:
+		case 0x80:
 			chgfet = 0;
 			dsgfet = 0;
 			break;
 		default:
-		case 0xc000:
+		case 0xc0:
 			chgfet = 1;
 			dsgfet = 0;
 			break;
 		}
 		chprintf(chp, "Charge FET:         %s\r\n", chgfet?"on":"off");
 		chprintf(chp, "Discharge FET:      %s\r\n", dsgfet?"on":"off");
-		chprintf(chp, "State:              %s\r\n", mfgr_states[word&0xf]);
-		if ((word&0xf) == 0x9)
+		chprintf(chp, "State:              %s\r\n", mfgr_states[stats[0] & 0xf]);
+		if ((stats[0] & 0xf) == 0x9)
 			chprintf(chp, "PermaFailure:       %s\r\n",
-					permafailures[word>>4&3]);
+					permafailures[(stats[0] >> 4) & 3]);
 	}
+
+	ret = gg_timetofull(I2C_BUS, &minutes);
+	if (ret < 0)
+		chprintf(chp, "Time until full:    error 0x%x\r\n", ret);
+	else
+		chprintf(chp, "Time until full:    %d minutes\r\n", minutes);
 
 	ret = gg_chem(driver, str);
 	if (ret < 0)
@@ -330,9 +354,15 @@ static void cmd_stats(BaseSequentialStream *chp, int argc, char **argv) {
 
 	ret = gg_fullcapacity(driver, &word);
 	if (ret < 0)
-		chprintf(chp, "Full Capacity:      error 0x%x\r\n", ret);
+		chprintf(chp, "Full capacity:      error 0x%x\r\n", ret);
 	else
-		chprintf(chp, "Full Capacity:      %d mAh\r\n", word);
+		chprintf(chp, "Full capacity:      %d mAh\r\n", word);
+
+	ret = gg_designcapacity(driver, &word);
+	if (ret < 0)
+		chprintf(chp, "Design capacity:    error 0x%x\r\n", ret);
+	else
+		chprintf(chp, "Design capacity:    %d mAh\r\n", word);
 
 	ret = gg_temperature(driver, &word);
 	if (ret < 0)
@@ -352,6 +382,18 @@ static void cmd_stats(BaseSequentialStream *chp, int argc, char **argv) {
 	else
 		chprintf(chp, "Current:            %d mA\r\n", word);
 
+	ret = gg_charging_current(driver, &word);
+	if (ret < 0)
+		chprintf(chp, "Charging current:   error 0x%x\r\n", ret);
+	else
+		chprintf(chp, "Charging current:   %d mA\r\n", word);
+
+	ret = gg_charging_voltage(driver, &word);
+	if (ret < 0)
+		chprintf(chp, "Charging voltage:   error 0x%x\r\n", ret);
+	else
+		chprintf(chp, "Charging voltage:   %d mV\r\n", word);
+
 	ret = gg_average_current(driver, &word);
 	if (ret < 0)
 		chprintf(chp, "Avg current:        error 0x%x\r\n", ret);
@@ -369,33 +411,35 @@ static void cmd_stats(BaseSequentialStream *chp, int argc, char **argv) {
 	}
 
 	chprintf(chp, "Alarms:\r\n");
-	word = 0;
-	ret = gg_getstatus(driver, &word);
-	if (word & 0x8000)
+	ret = gg_getstatus(driver, stats);
+	uint8_t tmp = stats[0];
+	stats[0] = stats[1];
+	stats[1] = tmp;
+	if (stats[0] & (1<<7))
 		chprintf(chp, "    OVERCHARGED ALARM\r\n");
-	if (word & 0x4000)
+	if (stats[0] & (1<<6))
 		chprintf(chp, "    TERMINATE CHARGE ALARM\r\n");
-	if (word & 0x1000)
+	if (stats[0] & (1<<4))
 		chprintf(chp, "    OVER TEMP ALARM\r\n");
-	if (word & 0x0800)
+	if (stats[0] & (1<<3))
 		chprintf(chp, "    TERMINATE DISCHARGE ALARM\r\n");
-	if (word & 0x0200)
+	if (stats[0] & (1<<1))
 		chprintf(chp, "    REMAINING CAPACITY ALARM\r\n");
-	if (word & 0x0100)
+	if (stats[0] & (1<<0))
 		chprintf(chp, "    REMAINING TIME ALARM\r\n");
 
 	chprintf(chp, "Charge state:\r\n");
-	if (word & 0x0080)
+	if (stats[1] & (1<<7))
 		chprintf(chp, "    Battery initialized\r\n");
-	if (word & 0x0040)
-		chprintf(chp, "    Battery discharging\r\n");
-	if (word & 0x0020)
+	if (stats[1] & (1<<6))
+		chprintf(chp, "    Battery discharging/relaxing\r\n");
+	if (stats[1] & (1<<5))
 		chprintf(chp, "    Battery fully charged\r\n");
-	if (word & 0x0010)
+	if (stats[1] & (1<<4))
 		chprintf(chp, "    Battery fully discharged\r\n");
 
-	if (word & 0x000f)
-		chprintf(chp, "STATUS ERROR CODE: 0x%x\r\n", word&0xf);
+	if (stats[1] & 0xf)
+		chprintf(chp, "STATUS ERROR CODE: 0x%x\r\n", stats[1]&0xf);
 	else
 		chprintf(chp, "No errors detected\r\n");
 
@@ -427,30 +471,57 @@ static void cmd_gg(BaseSequentialStream *chp, int argc, char **argv) {
 	int ret;
 
 	if (argc == 1 && (argv[0][0] == '+' || argv[0][0] == '-')) {
-		if (argv[0][0] == '+')
+		if (argv[0][0] == '+') {
+			ret = gg_setitenable(I2C_BUS);
+			if (ret < 0)
+				chprintf(chp, "Unable to enable ImpedanceTrack\r\n");
 			state = 1;
+		}
 		else
 			state = 0;
-		/*
 		chprintf(chp, "Going to %sable charge control\r\n", state>0?"EN":"DIS");
 		ret = gg_setchargecontrol(I2C_BUS, state);
 		if (ret < 0)
 			chprintf(chp, "Unable to set charge control: 0x%x\r\n", ret);
 		chprintf(chp, "Charge control %sabled\r\n", state>0?"EN":"DIS");
-		*/
-		chprintf(chp, "Going to %sable discharge FET\r\n", state>0?"EN":"DIS");
-		ret = gg_forcedsg(I2C_BUS, state);
+	}
+	else if (argc > 0 && !_strcasecmp(argv[0], "dsg")) {
+		if (argc == 2 && (argv[1][0] == '+' || argv[1][0] == '-')) {
+			if (argv[1][0] == '+')
+				ret = gg_forcedsg(I2C_BUS, 1);
+			else
+				ret = gg_forcedsg(I2C_BUS, 0);
+			if (ret < 0)
+				chprintf(chp, "Unable to force DSG fet: %d\r\n", ret);
+			else
+				chprintf(chp, "Charge control %sabled\r\n", (argv[1][0]=='+')>0?"EN":"DIS");
+		}
+		else {
+			chprintf(chp, "Usage: gg dsg +/-\r\n");
+			return;
+		}
+	}
+	else if (argc > 0 && !_strcasecmp(argv[0], "capacity")) {
+		uint16_t capacity;
+		int cells;
+		if (argc != 3) {
+			chprintf(chp, "Usage: gg capacity [cells] [capacity in mAh]\r\n");
+			return;
+		}
+		cells = _strtoul(argv[1], NULL, 0);
+		capacity = _strtoul(argv[2], NULL, 0);
+
+		chprintf(chp, "Setting capacity... ");
+		ret = gg_setcapacity(I2C_BUS, cells, capacity);
 		if (ret < 0)
-			chprintf(chp, "Unable to set FET: %d\r\n", ret);
+			chprintf(chp, "Unable to set capacity: 0x%x\r\n", ret);
+		else
+			chprintf(chp, "Set capacity of %d cells to %d mAh\r\n",
+					cells, capacity);
 	}
-	else if (argc == 1 && !_strcasecmp(argv[0], "cal")) {
-		chprintf(chp, "Calibrating... ");
-		gg_calibrate(I2C_BUS);
-		chprintf(chp, "Requested\r\n");
-		return;
-	}
-	else if (!_strcasecmp(argv[0], "cells")) {
+	else if (argc > 0 && !_strcasecmp(argv[0], "cells")) {
 		if (argc == 1) {
+			chprintf(chp, "Usage: gg cells [3/4]\r\n");
 		}
 		else {
 			if (argv[1][0] == '3') {
@@ -475,26 +546,20 @@ static void cmd_gg(BaseSequentialStream *chp, int argc, char **argv) {
 	}
 	else {
 		chprintf(chp,
-			"Usage: gg +/- (enables/disables charge control)\r\n");
+			"Usage:\r\n"
+			"gg +/-           Enable/disable charge control\r\n"
+			"gg cells [3/4]   Set cell count\r\n"
+			"gg cal           Calibrate battery pack\r\n"
+			);
 		return;
 	}
 
-}
-
-static void cmd_setpuv(BaseSequentialStream *chp, int argc, char **argv) {
-	uint16_t volts;
-	if (argc != 1) {
-		chprintf(chp,
-		"Usage: setpuv [mV] to set Power UnderVoltage threshhold\r\n");
-		return;
-	}
-	volts = _strtoul(argv[0], NULL, 0);
-	gg_setpuvthresh(I2C_BUS, volts);
 }
 
 static void cmd_setchem(BaseSequentialStream *chp, int argc, char **argv) {
 	uint8_t buf[4];
 	unsigned int i;
+	int ret;
 
 	if (argc != 1) {
 		chprintf(chp, "Usage: setchem [chemistry]\r\n");
@@ -502,17 +567,19 @@ static void cmd_setchem(BaseSequentialStream *chp, int argc, char **argv) {
 	}
 
 	/* XXX HACK TO GET FLASH VOLTAGE HIGH */
-	/*
 	palWritePad(GPIOA, PA12, 1);
 	chThdSleepMilliseconds(25);
 	chg_set(I2C_BUS, 1000, 12600, 2000>>1);
 	chThdSleepMilliseconds(25);
-	*/
 
 	_memset(buf, 0, sizeof(buf));
 	for (i=0; i<sizeof(buf) && argv[0][i]; i++)
 		buf[i] = argv[0][i];
-	gg_setchem(I2C_BUS, buf);
+	ret = gg_setchem(I2C_BUS, buf);
+	if (ret < 0)
+		chprintf(chp, "Unable to set chemistry: 0x%x\r\n", ret);
+	else
+		chprintf(chp, "Updated chemistry\r\n");
 
 	//chg_set(I2C_BUS, 0, 0, 0);
 	//palWritePad(GPIOA, PA12, 0);
@@ -587,18 +654,18 @@ static void cmd_chg(BaseSequentialStream *chp, int argc, char **argv) {
 			input = _strtoul(argv[2], NULL, 0);
 
 		/* Figure/check current */
-		if (current > 4096) {
+		if (current > 8064) {
 			chprintf(chp, "Error: That's too much current\r\n");
 			return;
 		}
-		if (current < 256) {
-			chprintf(chp, "Error: 256 mA is the minimum charge current\r\n");
+		if (current < 128) {
+			chprintf(chp, "Error: 128 mA is the minimum charge current\r\n");
 			return;
 		}
 		current &= 0x1f80;
 
 		/* Figure/check voltage */
-		if (voltage > 16384) {
+		if (voltage > 19200) {
 			chprintf(chp, "Error: That's an awful lot of voltage\r\n");
 			return;
 		}
