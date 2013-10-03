@@ -702,8 +702,50 @@ static void cmd_chg(BaseSequentialStream *chp, int argc, char **argv) {
 }
 
 int getVer(void) {
-	return 9;
+	return 10;
 }
+
+static VirtualTimer vt;
+static void callTogglePower(void *arg)
+{
+	(void)arg;
+	chThdSleepMilliseconds(100);
+	pmb_toggle_power();
+	chThdSleepMilliseconds(100);
+}
+
+static void gpio14_callback(EXTDriver *extp, expchannel_t channel) {
+	(void)extp;
+	chSysLockFromIsr();
+	if (!chVTIsArmedI(&vt))
+		chVTSetI(&vt, MS2ST(100), callTogglePower, (void *)channel);
+	chSysUnlockFromIsr();
+}
+
+static const EXTConfig extcfg = {
+	{
+		{EXT_CH_MODE_DISABLED, NULL},
+		{EXT_CH_MODE_DISABLED, NULL},
+		{EXT_CH_MODE_DISABLED, NULL},
+		{EXT_CH_MODE_DISABLED, NULL},
+		{EXT_CH_MODE_DISABLED, NULL},
+		{EXT_CH_MODE_DISABLED, NULL},
+		{EXT_CH_MODE_DISABLED, NULL},
+		{EXT_CH_MODE_DISABLED, NULL},
+		{EXT_CH_MODE_DISABLED, NULL},
+		{EXT_CH_MODE_DISABLED, NULL},
+		{EXT_CH_MODE_DISABLED, NULL},
+		{EXT_CH_MODE_DISABLED, NULL},
+		{EXT_CH_MODE_DISABLED, NULL},
+		{EXT_CH_MODE_DISABLED, NULL},
+		{EXT_CH_MODE_FALLING_EDGE
+			| EXT_CH_MODE_AUTOSTART
+			| EXT_MODE_GPIOB, gpio14_callback},
+		{EXT_CH_MODE_DISABLED, NULL}
+	}
+};
+
+
 
 static WORKING_AREA(shell_wa, SHELL_WA_SIZE);
 
@@ -739,6 +781,16 @@ int main(void) {
 	 * This thread takes care of that for us.
 	 */
 	chg_runthread(I2C_BUS);
+
+	/*
+	 * The overall power management board must monitor CHG_CRIT, which
+	 * tells us if the battery is in a critical state.
+	 * If this happens, the mainboard is powered off.
+	 */
+	pmb_runthread(I2C_BUS);
+
+	/* Begin listening to GPIOs (e.g. the button) */
+	extStart(&EXTD1, &extcfg);
 
 	while (1) {
 		if (!shell_thr)
