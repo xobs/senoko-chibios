@@ -733,6 +733,13 @@ int main(void) {
 	chprintf(STREAM, "~Resetting (%d)~\r\n", getVer());
 	chThdSleepMilliseconds(10);
 
+	/*
+	 * The battery charger has its own thread, because it has a
+	 * watchdog that must be updated once every 170 seconds.
+	 * This thread takes care of that for us.
+	 */
+	chg_runthread(I2C_BUS);
+
 	while (1) {
 		if (!shell_thr)
 			shell_thr = shellCreateStatic(&shell_cfg, shell_wa,
@@ -746,7 +753,7 @@ int main(void) {
 
 			chprintf(STREAM, "\r\nShell exited...\r\n");
 		}
-		chThdSleepMilliseconds(50);
+		chThdSleepMilliseconds(500);
 	}
 
 	return 0;

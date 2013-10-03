@@ -14,9 +14,9 @@
 #define STREAM          ((BaseSequentialStream *)STREAM_SERIAL)
 
 /* SMBus times out after 25ms in hardware */
-static systime_t tmo   = TIME_INFINITE;
+static const systime_t tmo   = TIME_INFINITE;
 
-static struct cell_cfg {
+static const struct cell_cfg {
 	uint16_t pov_threshold;
 	uint16_t pov_recovery;
 	uint16_t puv_threshold;

@@ -14,7 +14,12 @@
 #define STREAM          ((BaseSequentialStream *)STREAM_SERIAL)
 
 /* SMBus times out after 25ms in hardware */
-static systime_t tmo   = TIME_INFINITE;
+static const systime_t tmo   = TIME_INFINITE;
+
+#define THREAD_SLEEP 120000
+static uint16_t g_current;
+static uint16_t g_voltage;
+static uint16_t g_input;
 
 /*
  * HACK: If we've just transmitted one byte, then the next I2C transfer
@@ -50,12 +55,10 @@ static int chg_getblock(struct I2CDriver *driver, uint8_t reg,
 static int chg_setblock(struct I2CDriver *driver, void *data, int size) {
 	msg_t status;
 
-	i2cAcquireBus(driver);
 	status = i2cMasterTransmitTimeout(driver, CHG_ADDR,
 					data, size,
 					NULL, 0,
 					tmo);
-	i2cReleaseBus(driver);
 
 	if (status != RDY_OK) {
 		if (status == RDY_TIMEOUT)
@@ -66,37 +69,40 @@ static int chg_setblock(struct I2CDriver *driver, void *data, int size) {
 	return 0;
 }
 
-int chg_set(struct I2CDriver *driver, uint32_t current,
-		uint32_t voltage, uint32_t input) {
+int chg_set(struct I2CDriver *driver, uint16_t current,
+		uint16_t voltage, uint16_t input) {
 	int ret;
-	uint16_t val;
 	uint8_t bfr[3];
 
-	val = input;
+	i2cAcquireBus(driver);
+
+	g_input = input;
 	bfr[0] = 0x3f;
-	bfr[1] = val;
-	bfr[2] = val>>8;
+	bfr[1] = g_input;
+	bfr[2] = g_input>>8;
 	ret = chg_setblock(driver, bfr, sizeof(bfr));
 	if (ret)
-		return ret;
+		goto out;
 
-	val = current;
+	g_current = current;
 	bfr[0] = 0x14;
-	bfr[1] = val;
-	bfr[2] = val>>8;
+	bfr[1] = g_current;
+	bfr[2] = g_current>>8;
 	ret = chg_setblock(driver, bfr, sizeof(bfr));
 	if (ret)
-		return ret;
+		goto out;
 
-	val = voltage;
+	g_voltage = voltage;
 	bfr[0] = 0x15;
-	bfr[1] = val;
-	bfr[2] = val>>8;
+	bfr[1] = g_voltage;
+	bfr[2] = g_voltage>>8;
 	ret = chg_setblock(driver, bfr, sizeof(bfr));
 	if (ret)
-		return ret;
+		goto out;
 
-	return 0;
+out:
+	i2cReleaseBus(driver);
+	return ret;
 }
 
 int chg_get(struct I2CDriver *driver, uint16_t *current,
@@ -113,4 +119,19 @@ int chg_getmanuf(struct I2CDriver *driver, uint16_t *word) {
 
 int chg_getdevice(struct I2CDriver *driver, uint16_t *word) {
 	return chg_getblock(driver, 0xff, word, 2);
+}
+
+static WORKING_AREA(chg_wa, 256);
+static msg_t chg_thread(void *arg) {
+	struct I2CDriver *driver = arg;
+	chThdSleepMilliseconds(200);
+	while (1) {
+		chg_set(driver, g_current, g_voltage, g_input);
+		chThdSleepMilliseconds(THREAD_SLEEP);
+	}
+	return 0;
+}
+
+void chg_runthread(struct I2CDriver *driver) {
+	chThdCreateStatic(chg_wa, sizeof(chg_wa), HIGHPRIO, chg_thread, driver);
 }
