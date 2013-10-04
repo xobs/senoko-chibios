@@ -467,25 +467,9 @@ static void cmd_leds(BaseSequentialStream *chp, int argc, char **argv) {
 }
 
 static void cmd_gg(BaseSequentialStream *chp, int argc, char **argv) {
-	int state;
 	int ret;
 
-	if (argc == 1 && (argv[0][0] == '+' || argv[0][0] == '-')) {
-		if (argv[0][0] == '+') {
-			ret = gg_setitenable(I2C_BUS);
-			if (ret < 0)
-				chprintf(chp, "Unable to enable ImpedanceTrack\r\n");
-			state = 1;
-		}
-		else
-			state = 0;
-		chprintf(chp, "Going to %sable charge control\r\n", state>0?"EN":"DIS");
-		ret = gg_setchargecontrol(I2C_BUS, state);
-		if (ret < 0)
-			chprintf(chp, "Unable to set charge control: 0x%x\r\n", ret);
-		chprintf(chp, "Charge control %sabled\r\n", state>0?"EN":"DIS");
-	}
-	else if (argc > 0 && !_strcasecmp(argv[0], "dsg")) {
+	if (argc > 0 && !_strcasecmp(argv[0], "dsg")) {
 		if (argc == 2 && (argv[1][0] == '+' || argv[1][0] == '-')) {
 			if (argv[1][0] == '+')
 				ret = gg_forcedsg(I2C_BUS, 1);
@@ -494,7 +478,7 @@ static void cmd_gg(BaseSequentialStream *chp, int argc, char **argv) {
 			if (ret < 0)
 				chprintf(chp, "Unable to force DSG fet: %d\r\n", ret);
 			else
-				chprintf(chp, "Charge control %sabled\r\n", (argv[1][0]=='+')>0?"EN":"DIS");
+				chprintf(chp, "Discharge FET forced %s\r\n", (argv[1][0]=='+')>0?"on":"off");
 		}
 		else {
 			chprintf(chp, "Usage: gg dsg +/-\r\n");
@@ -547,7 +531,7 @@ static void cmd_gg(BaseSequentialStream *chp, int argc, char **argv) {
 	else {
 		chprintf(chp,
 			"Usage:\r\n"
-			"gg +/-           Enable/disable charge control\r\n"
+			"gg dsg +/-       Force dsg fet on or off\r\n"
 			"gg cells [3/4]   Set cell count\r\n"
 			"gg cal           Calibrate battery pack\r\n"
 			);
@@ -566,12 +550,6 @@ static void cmd_setchem(BaseSequentialStream *chp, int argc, char **argv) {
 		return;
 	}
 
-	/* XXX HACK TO GET FLASH VOLTAGE HIGH */
-	palWritePad(GPIOA, PA12, 1);
-	chThdSleepMilliseconds(25);
-	chg_set(I2C_BUS, 1000, 12600, 2000>>1);
-	chThdSleepMilliseconds(25);
-
 	_memset(buf, 0, sizeof(buf));
 	for (i=0; i<sizeof(buf) && argv[0][i]; i++)
 		buf[i] = argv[0][i];
@@ -579,10 +557,8 @@ static void cmd_setchem(BaseSequentialStream *chp, int argc, char **argv) {
 	if (ret < 0)
 		chprintf(chp, "Unable to set chemistry: 0x%x\r\n", ret);
 	else
-		chprintf(chp, "Updated chemistry\r\n");
-
-	//chg_set(I2C_BUS, 0, 0, 0);
-	//palWritePad(GPIOA, PA12, 0);
+		chprintf(chp, "Updated chemistry to: %c%c%c%c\r\n",
+				buf[0], buf[1], buf[2], buf[3]);
 }
 
 static void cmd_setmanuf(BaseSequentialStream *chp, int argc, char **argv) {
@@ -604,7 +580,11 @@ static void cmd_setmanuf(BaseSequentialStream *chp, int argc, char **argv) {
 		return;
 	}
 
-	chprintf(chp, "Manufacturer set\r\n");
+	chprintf(chp, "Manufacturer set to: ");
+	for (i=0; i<11 && manuf[i]; i++)
+		chprintf(chp, "%c", manuf[i]);
+	chprintf(chp, "\r\n");
+
 	return;
 }
 
@@ -614,7 +594,6 @@ static void cmd_chg(BaseSequentialStream *chp, int argc, char **argv) {
 	if (argc == 0) {
 		uint16_t word = 0;
 		uint16_t current, voltage, input;
-		chprintf(chp, "Usage: chg [current] [voltage] [[input]]\r\n");
 		chprintf(chp, "\tCurrent is measured in mA, voltage in mV\r\n");
 
 		ret = chg_getmanuf(I2C_BUS, &word);
@@ -628,6 +607,7 @@ static void cmd_chg(BaseSequentialStream *chp, int argc, char **argv) {
 		ret = chg_get(I2C_BUS, &current, &voltage, &input);
 		chprintf(chp, "Charger state: %dmA @ %dmV (input: %dmA)\r\n",
 				current, voltage, input<<1);
+		chprintf(chp, "Usage: chg [current] [voltage] [[input]]\r\n");
 		return;
 	}
 
@@ -709,20 +689,19 @@ static VirtualTimer vt;
 static void callTogglePower(void *arg)
 {
 	(void)arg;
-	chThdSleepMilliseconds(100);
 	pmb_toggle_power();
-	chThdSleepMilliseconds(100);
 }
 
 static void gpio14_callback(EXTDriver *extp, expchannel_t channel) {
 	(void)extp;
+	(void)channel;
 	chSysLockFromIsr();
 	if (!chVTIsArmedI(&vt))
-		chVTSetI(&vt, MS2ST(100), callTogglePower, (void *)channel);
+		chVTSetI(&vt, MS2ST(100), callTogglePower, NULL);
 	chSysUnlockFromIsr();
 }
 
-static const EXTConfig extcfg = {
+static const EXTConfig extcfg ={
 	{
 		{EXT_CH_MODE_DISABLED, NULL},
 		{EXT_CH_MODE_DISABLED, NULL},
@@ -772,7 +751,7 @@ int main(void) {
 
 	sdStart(STREAM_SERIAL, &ser_cfg);
 
-	chprintf(STREAM, "~Resetting (%d)~\r\n", getVer());
+	chprintf(STREAM, "\r\n~Resetting (%d)~\r\n", getVer());
 	chThdSleepMilliseconds(10);
 
 	/*
@@ -792,15 +771,19 @@ int main(void) {
 	/* Begin listening to GPIOs (e.g. the button) */
 	extStart(&EXTD1, &extcfg);
 
+	/* Enable ImpedenceTrack(TM), to log charge status */
+	gg_setitenable(I2C_BUS);
+
 	while (1) {
 		if (!shell_thr)
 			shell_thr = shellCreateStatic(&shell_cfg, shell_wa,
 						SHELL_WA_SIZE, NORMALPRIO);
 		else if (chThdTerminated(shell_thr)) {
-			/* Recovers memory of the previous shell.   */
+
+			/* Recovers memory of the previous shell. */
 			chThdRelease(shell_thr);
 
-			/* Triggers spawning of a new shell.        */
+			/* Triggers spawning of a new shell. */
 			shell_thr = NULL;
 
 			chprintf(STREAM, "\r\nShell exited...\r\n");

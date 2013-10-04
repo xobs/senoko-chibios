@@ -802,6 +802,7 @@ int gg_setchargecontrol(struct I2CDriver *driver, int state) {
 	uint8_t reg[2];
 	int ret;
 
+#if 0
 	/* Disable the feature in flash, if necessary */
 	ret = gg_getflash(driver, 64, 2, reg, 2);
 	if (ret < 0)
@@ -811,6 +812,7 @@ int gg_setchargecontrol(struct I2CDriver *driver, int state) {
 		reg[1] &= ~1;
 		ret = gg_setflash(driver, 64, 2, reg, 2);
 	}
+#endif
 
 	/* Turn on charge control */
 	ret = gg_getblock(driver, 0x03, reg, 2);
