@@ -301,21 +301,21 @@ static void cmd_stats(BaseSequentialStream *chp, int argc, char **argv) {
 		chprintf(chp, "State:              error 0x%x\r\n", ret);
 	else {
 		int chgfet, dsgfet;
-		switch (stats[0]) {
-		case 0x00:
+		switch (stats[0]>>6) {
+		case 0:
 			chgfet = 1;
 			dsgfet = 1;
 			break;
-		case 0x40:
+		case 1:
 			chgfet = 0;
 			dsgfet = 1;
 			break;
-		case 0x80:
+		case 2:
 			chgfet = 0;
 			dsgfet = 0;
 			break;
+		case 3:
 		default:
-		case 0xc0:
 			chgfet = 1;
 			dsgfet = 0;
 			break;
@@ -773,6 +773,9 @@ int main(void) {
 
 	/* Enable ImpedenceTrack(TM), to log charge status */
 	gg_setitenable(I2C_BUS);
+
+	/* Set the battery to Primary, so we can power ourselves off it */
+	gg_setprimary(I2C_BUS);
 
 	while (1) {
 		if (!shell_thr)
