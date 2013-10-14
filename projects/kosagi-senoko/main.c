@@ -334,6 +334,12 @@ static void cmd_stats(BaseSequentialStream *chp, int argc, char **argv) {
 	else
 		chprintf(chp, "Time until full:    %d minutes\r\n", minutes);
 
+	ret = gg_timetoempty(I2C_BUS, &minutes);
+	if (ret < 0)
+		chprintf(chp, "Time until empty:   error 0x%x\r\n", ret);
+	else
+		chprintf(chp, "Time until empty:   %d minutes\r\n", minutes);
+
 	ret = gg_chem(driver, str);
 	if (ret < 0)
 		chprintf(chp, "Chemistry:          error 0x%x\r\n", ret);

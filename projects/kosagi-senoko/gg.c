@@ -587,7 +587,7 @@ int gg_serial(struct I2CDriver *driver, void *serial) {
 }
 
 int gg_percent(struct I2CDriver *driver, uint8_t *capacity) {
-	return gg_getbyte(driver, 0x0f, capacity);
+	return gg_getbyte(driver, 0x0d, capacity);
 }
 
 int gg_cellvoltage(struct I2CDriver *driver, int cell, void *voltage) {
@@ -673,6 +673,10 @@ int gg_temperature(struct I2CDriver *driver, int16_t *word) {
 
 int gg_timetofull(struct I2CDriver *driver, uint16_t *minutes) {
 	return gg_getword(driver, 0x13, minutes);
+}
+
+int gg_timetoempty(struct I2CDriver *driver, uint16_t *minutes) {
+	return gg_getword(driver, 0x12, minutes);
 }
 
 int gg_voltage(struct I2CDriver *driver, void *word) {

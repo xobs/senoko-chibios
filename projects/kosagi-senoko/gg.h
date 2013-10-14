@@ -36,6 +36,7 @@ int gg_calibrate(struct I2CDriver *driver,
 		uint16_t temperature, int cells);
 int gg_setcapacity(struct I2CDriver *driver, int cells, uint16_t capacity);
 int gg_setitenable(struct I2CDriver *driver);
+int gg_timetoempty(struct I2CDriver *driver, uint16_t *minutes);
 int gg_timetofull(struct I2CDriver *driver, uint16_t *minutes);
 
 
