@@ -59,7 +59,7 @@ PROJECT = pmb
 
 # Imported source files and paths
 CHIBIOS = ../..
-include $(CHIBIOS)/boards/NOVENA_STM32F1_PMB/board.mk
+include $(CHIBIOS)/boards/KOSAGI_STM32F1_SENOKO/board.mk
 include $(CHIBIOS)/os/hal/platforms/STM32F1xx/platform.mk
 include $(CHIBIOS)/os/hal/hal.mk
 include $(CHIBIOS)/os/ports/GCC/ARMCMx/STM32F1xx/port.mk

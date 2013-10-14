@@ -18,14 +18,14 @@
 #define _BOARD_H_
 
 /*
- * Setup for Novena STM32F1-PMB board.
+ * Setup for Senoko STM32F1 board.
  */
 
 /*
  * Board identifier.
  */
-#define BOARD_NOVENA_STM32F1_PMB
-#define BOARD_NAME                  "Novena STM32F1-Novena"
+#define BOARD_KOSAGI_STM32F1_SENOKO
+#define BOARD_NAME                  "Senoko STM32F1"
 
 
 /*
