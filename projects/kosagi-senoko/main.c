@@ -26,6 +26,7 @@
 #include "chg.h"
 #include "pmb.h"
 #include "bionic.h"
+#include "gitversion.h"
 
 #define STREAM_SERIAL	(&SD1)
 #define STREAM		((BaseSequentialStream *)STREAM_SERIAL)
@@ -35,6 +36,8 @@
 #define DAC_ADDR 0xd
 
 #define CHARGE_VOLTAGE(cells) (4.2*cells)
+
+static int getVer(void) { return 11; }
 
 static void cmd_i2c(BaseSequentialStream *chp, int argc, char **argv);
 static void cmd_mode(BaseSequentialStream *chp, int argc, char **argv);
@@ -687,10 +690,6 @@ static void cmd_chg(BaseSequentialStream *chp, int argc, char **argv) {
 	return;
 }
 
-int getVer(void) {
-	return 10;
-}
-
 static VirtualTimer vt;
 static void callTogglePower(void *arg)
 {
@@ -757,7 +756,7 @@ int main(void) {
 
 	sdStart(STREAM_SERIAL, &ser_cfg);
 
-	chprintf(STREAM, "\r\n~Resetting (%d)~\r\n", getVer());
+	chprintf(STREAM, "\r\n~Resetting (Ver %d, git version %s)~\r\n", getVer(), gitversion);
 	chThdSleepMilliseconds(10);
 
 	/*

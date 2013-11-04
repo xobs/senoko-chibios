@@ -80,7 +80,8 @@ CSRC = $(PORTSRC) \
        bionic.c \
        gg.c chg.c \
        pmb.c \
-       main.c
+       main.c \
+       gitversion.c
 
 # C++ sources that can be compiled in ARM or THUMB mode depending on the global
 # setting.
@@ -209,3 +210,7 @@ ifeq ($(USE_FWLIB),yes)
 endif
 
 include $(CHIBIOS)/os/ports/GCC/ARMCMx/rules.mk
+
+gitversion.c: $(CHIBIOS)/.git/HEAD $(CHIBIOS)/.git/index
+	echo "const char *gitversion = \"$(shell git rev-parse HEAD)\";" > $@
+
