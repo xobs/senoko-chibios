@@ -55,7 +55,7 @@ endif
 #
 
 # Define project name here
-PROJECT = pmb
+PROJECT = senoko
 
 # Imported source files and paths
 CHIBIOS = ../..
