@@ -5,6 +5,7 @@
 #include <string.h>
 
 #include "chg.h"
+#include "gg.h"
 #include "pmb.h"
 #include "bionic.h"
 
@@ -16,7 +17,11 @@
 /* SMBus times out after 25ms in hardware */
 static const systime_t tmo   = TIME_INFINITE;
 
-#define THREAD_SLEEP 120000
+#define THREAD_SLEEP_MS 1100
+#define MAX_ERRORS 10
+/* This is the ABSOLUTE MAXIMUM voltage allowed for each cell */
+#define MV_MAX 4200
+#define MV_MIN 3000
 static uint16_t g_current;
 static uint16_t g_voltage;
 static uint16_t g_input;
@@ -124,10 +129,62 @@ int chg_getdevice(struct I2CDriver *driver, uint16_t *word) {
 static WORKING_AREA(chg_wa, 256);
 static msg_t chg_thread(void *arg) {
 	struct I2CDriver *driver = arg;
+	int error_count = 0;
+
 	chThdSleepMilliseconds(200);
+
 	while (1) {
+		int16_t cell_mv;
+		int cell;
+		int ret;
+		uint8_t cell_count;
+
+		chThdSleepMilliseconds(THREAD_SLEEP_MS);
+
+		if (error_count > MAX_ERRORS) {
+			g_current = 0;
+			g_voltage = 0;
+			chg_set(driver, g_current, g_voltage, g_input);
+		}
+
+
 		chg_set(driver, g_current, g_voltage, g_input);
-		chThdSleepMilliseconds(THREAD_SLEEP);
+		ret = gg_getcells(driver, &cell_count);
+		if (ret) {
+			error_count++;
+			continue;
+		}
+
+		/*
+		 * Examine each cell to determine if it's undervoltage or
+		 * overvoltage.  If it's undervoltage, cut power to the
+		 * mainboard.  For overvoltage, stop charging.
+		 */
+		for (cell = 1; cell <= cell_count; cell++) {
+			ret = gg_cellvoltage(driver, cell, &cell_mv);
+			if (ret) {
+				error_count++;
+				continue;
+			}
+
+			/*
+			 * If any one cell goes below the minimum, shut down
+			 * everything.  These cells are very prone to expanding,
+			 * and we don't want to stress them.
+			 */
+			if (cell_mv > 0 && cell_mv < MV_MIN
+					&& (!g_current || !g_voltage))
+				pmb_power_off();
+
+			/* If we exceed the max voltage, shut down charging */
+			if (cell_mv > MV_MAX && (g_current || g_voltage)) {
+				g_current = 0;
+				g_voltage = 0;
+				chg_set(driver, g_current, g_voltage, g_input);
+			}
+		}
+
+		error_count = 0;
 	}
 	return 0;
 }
