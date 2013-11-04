@@ -379,6 +379,12 @@ static void cmd_stats(BaseSequentialStream *chp, int argc, char **argv) {
 	else
 		chprintf(chp, "Temperature:        %d.%d C\r\n", word/10, word-(10*(word/10)));
 
+	ret = gg_getcells(driver, &byte);
+	if (ret < 0)
+		chprintf(chp, "Cell count:         error 0x%x\r\n", ret);
+	else
+		chprintf(chp, "Cell count:         %d cells\r\n", byte);
+
 	ret = gg_voltage(driver, &word);
 	if (ret < 0)
 		chprintf(chp, "Voltage:            error 0x%x\r\n", ret);

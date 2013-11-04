@@ -508,6 +508,20 @@ int gg_setcells(struct I2CDriver *driver, int cells) {
 	return 0;
 }
 
+int gg_getcells(struct I2CDriver *driver, uint8_t *cells) {
+	int ret;
+	uint8_t cfg_a[2];
+
+	ret = gg_getflash(driver, 64, 0, cfg_a, sizeof(cfg_a));
+	if (ret < 0)
+		return ret;
+
+	/* Cell count, in the current chip, happens to be cfg_a[1:0] + 1 */
+	*cells = (cfg_a[0] & 0x3) + 1;
+
+	return 0;
+}
+
 
 int gg_getword(struct I2CDriver *driver, uint8_t reg, void *word) {
 	return gg_getblock(driver, reg, word, 2);
@@ -742,81 +756,9 @@ int gg_setitenable(struct I2CDriver *driver) {
 	return gg_getmfgr(driver, 0x0021, NULL, 0);
 }
 
-#if 0
-int gg_calibrate(struct I2CDriver *driver,
-		int16_t voltage, int16_t current,
-		uint16_t temperature, int cells) {
-	int ret;
-	ret = gg_getmfgr(driver, 0x0040, NULL, 0);
-	if (ret < 0)
-		return ret;
-
-	ret = gg_setword(driver, 0x63, cells);
-	if (ret < 0) {
-		chprintf(STREAM, "Unable to set number of cells\r\n");
-		goto out;
-	}
-
-	ret = gg_setword(driver, 0x60, current);
-	if (ret < 0) {
-		chprintf(STREAM, "Unable to set current\r\n");
-		goto out;
-	}
-
-	ret = gg_setword(driver, 0x61, voltage);
-	if (ret < 0) {
-		chprintf(STREAM, "Unable to set voltage\r\n");
-		goto out;
-	}
-
-	ret = gg_setword(driver, 0x62, temperature);
-	if (ret < 0) {
-		chprintf(STREAM, "Unable to set temperature\r\n");
-		goto out;
-	}
-
-	/* Start calibration */
-	ret = gg_setword(driver, 0x51, 0xc0d5);
-	int tries;
-	for (tries=0; tries<10; tries++) {
-		uint16_t val;
-		chThdSleepMilliseconds(200);
-		ret = gg_getword(driver, 0x52, &val);
-		if (ret < 0) {
-			chprintf(STREAM, "Unable to query: %d\r\n", ret);
-			continue;
-		}
-		chprintf(STREAM, "Val: 0x%x\r\n", val);
-		if (val & 0x3fff)
-			break;
-	}
-
-	/* Write results to flash */
-
-
-	return gg_setnull(driver, 0x73);
-
-out:
-	gg_setnull(driver, 0x73);
-	return ret;
-}
-#endif
-
 int gg_setchargecontrol(struct I2CDriver *driver, int state) {
 	uint8_t reg[2];
 	int ret;
-
-#if 0
-	/* Disable the feature in flash, if necessary */
-	ret = gg_getflash(driver, 64, 2, reg, 2);
-	if (ret < 0)
-		return ret;
-
-	if (reg[1] & 1) {
-		reg[1] &= ~1;
-		ret = gg_setflash(driver, 64, 2, reg, 2);
-	}
-#endif
 
 	/* Turn on charge control */
 	ret = gg_getblock(driver, 0x03, reg, 2);

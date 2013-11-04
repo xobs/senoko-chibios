@@ -31,6 +31,7 @@ int gg_forcedsg(struct I2CDriver *driver, int state);
 int gg_setmanuf(struct I2CDriver *driver, uint8_t name[11]);
 int gg_setchem(struct I2CDriver *driver, uint8_t chem[4]);
 int gg_setcells(struct I2CDriver *driver, int cells);
+int gg_getcells(struct I2CDriver *driver, uint8_t *cells);
 int gg_calibrate(struct I2CDriver *driver,
 		int16_t voltage, int16_t current,
 		uint16_t temperature, int cells);
