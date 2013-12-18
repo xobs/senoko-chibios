@@ -19,6 +19,22 @@ static const systime_t tmo   = TIME_INFINITE;
 
 #define THREAD_SLEEP_MS 1100
 #define MAX_ERRORS 10
+
+/* If we're under 95%, charge the battery */
+#define CAPACITY_TO_CHARGE 95
+
+/* If the current is less than this, enable the charger */
+#define CURRENT_TO_CHARGE 1
+
+/* Rate (in mA) at which the battery can charge */
+#define CHARGE_CURRENT 3000
+
+/* Target voltage (in mV) of the battery */
+#define CHARGE_VOLTAGE 12600
+
+/* Rate (in mA) at which the wall can supply current */
+#define CHARGE_WALL_CURRENT 3420
+
 /* This is the ABSOLUTE MAXIMUM voltage allowed for each cell */
 #define MV_MAX 4200
 #define MV_MIN 3000
@@ -79,12 +95,29 @@ int chg_set(struct I2CDriver *driver, uint16_t current,
 	int ret;
 	uint8_t bfr[3];
 
+
+	if (current > 8064)
+		return -1;
+
+	if (voltage > 19200)
+		return -1;
+
+	if (input > 11004)
+		return -1;
+
+	current &= 0x1f80;
+
+	voltage &= 0x7ff0;
+
+	input >>= 1;
+	input &= 0x1f80;
+
 	i2cAcquireBus(driver);
 
 	g_input = input;
 	bfr[0] = 0x3f;
 	bfr[1] = g_input;
-	bfr[2] = g_input>>8;
+	bfr[2] = g_input >> 8;
 	ret = chg_setblock(driver, bfr, sizeof(bfr));
 	if (ret)
 		goto out;
@@ -92,7 +125,7 @@ int chg_set(struct I2CDriver *driver, uint16_t current,
 	g_current = current;
 	bfr[0] = 0x14;
 	bfr[1] = g_current;
-	bfr[2] = g_current>>8;
+	bfr[2] = g_current >> 8;
 	ret = chg_setblock(driver, bfr, sizeof(bfr));
 	if (ret)
 		goto out;
@@ -100,7 +133,7 @@ int chg_set(struct I2CDriver *driver, uint16_t current,
 	g_voltage = voltage;
 	bfr[0] = 0x15;
 	bfr[1] = g_voltage;
-	bfr[2] = g_voltage>>8;
+	bfr[2] = g_voltage >> 8;
 	ret = chg_setblock(driver, bfr, sizeof(bfr));
 	if (ret)
 		goto out;
@@ -115,6 +148,7 @@ int chg_get(struct I2CDriver *driver, uint16_t *current,
 	chg_getblock(driver, 0x3f, input, 2);
 	chg_getblock(driver, 0x14, current, 2);
 	chg_getblock(driver, 0x15, voltage, 2);
+	*input <<= 1;
 	return 0;
 }
 
@@ -138,17 +172,44 @@ static msg_t chg_thread(void *arg) {
 		int cell;
 		int ret;
 		uint8_t cell_count;
+		uint8_t capacity;
+		int16_t current;
 
 		chThdSleepMilliseconds(THREAD_SLEEP_MS);
 
-		if (error_count > MAX_ERRORS) {
-			g_current = 0;
-			g_voltage = 0;
-			chg_set(driver, g_current, g_voltage, g_input);
+
+		/*
+		 * Determine the battery's capacity and charge current,
+		 * so we can decide if we need to charge or not.
+		 */
+		ret = gg_percent(driver, &capacity);
+		if (ret < 0) {
+			error_count++;
+			capacity = CAPACITY_TO_CHARGE;
 		}
 
+		ret = gg_average_current(driver, &current);
+		if (ret < 0) {
+			error_count++;
+			current = CURRENT_TO_CHARGE;
+		}
 
-		chg_set(driver, g_current, g_voltage, g_input);
+		/* Charge the battery if necessary */
+		if (capacity < CAPACITY_TO_CHARGE
+		 && current < CURRENT_TO_CHARGE
+		 && (g_current == 0 || g_voltage == 0)) {
+			chg_set(driver, CHARGE_CURRENT,
+					CHARGE_VOLTAGE,
+					CHARGE_WALL_CURRENT);
+			continue;
+		}
+
+		if (error_count > MAX_ERRORS)
+			chg_set(driver, 0, 0, g_input << 1);
+
+
+		/* Feed the charger watchdog timer */
+		chg_set(driver, g_current, g_voltage, g_input << 1);
 		ret = gg_getcells(driver, &cell_count);
 		if (ret) {
 			error_count++;
@@ -177,11 +238,8 @@ static msg_t chg_thread(void *arg) {
 				pmb_power_off();
 
 			/* If we exceed the max voltage, shut down charging */
-			if (cell_mv > MV_MAX && (g_current || g_voltage)) {
-				g_current = 0;
-				g_voltage = 0;
-				chg_set(driver, g_current, g_voltage, g_input);
-			}
+			if (cell_mv > MV_MAX && (g_current || g_voltage))
+				chg_set(driver, 0, 0, g_input << 1);
 		}
 
 		error_count = 0;

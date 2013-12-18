@@ -621,14 +621,16 @@ static void cmd_chg(BaseSequentialStream *chp, int argc, char **argv) {
 
 		ret = chg_get(I2C_BUS, &current, &voltage, &input);
 		chprintf(chp, "Charger state: %dmA @ %dmV (input: %dmA)\r\n",
-				current, voltage, input<<1);
+				current, voltage, input);
 		chprintf(chp, "Usage: chg [current] [voltage] [[input]]\r\n");
 		return;
 	}
 
 	if (argc == 1) {
 		chprintf(chp, "Disabling charging\r\n");
-		chg_set(I2C_BUS, 0, 0, 0);
+		ret = chg_set(I2C_BUS, 0, 0, 0);
+		if (ret < 0)
+			chprintf(chp, "Error setting charge: %d\n", ret);
 		return;
 	}
 
@@ -657,7 +659,6 @@ static void cmd_chg(BaseSequentialStream *chp, int argc, char **argv) {
 			chprintf(chp, "Error: 128 mA is the minimum charge current\r\n");
 			return;
 		}
-		current &= 0x1f80;
 
 		/* Figure/check voltage */
 		if (voltage > 19200) {
@@ -669,7 +670,6 @@ static void cmd_chg(BaseSequentialStream *chp, int argc, char **argv) {
 			chprintf(chp, "Error: Too little voltage (1024 mV min)\r\n");
 			return;
 		}
-		voltage &= 0x7ff0;
 
 		/* Figure/check input current */
 		if (input > 11004) {
@@ -681,11 +681,9 @@ static void cmd_chg(BaseSequentialStream *chp, int argc, char **argv) {
 			chprintf(chp, "Error: Input current must be at least 256 mA\r\n");
 			return;
 		}
-		input >>= 1; /* 0b00000001 is 2 mA */
-		input &= 0x1f80;
 
 		chprintf(chp, "Setting charger: %dmA @ %dmV (input: %dmA)... ",
-				current, voltage, input<<1);
+				current, voltage, input);
 		ret = chg_set(I2C_BUS, current, voltage, input);
 		if (ret < 0)
 			chprintf(chp, "Error: 0x%x\r\n", ret);

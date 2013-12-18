@@ -59,6 +59,8 @@ static msg_t pmb_thread(void *arg) {
 	struct I2CDriver *driver = arg;
 	while (1) {
 		chThdSleepMilliseconds(200);
+
+		/* Monitor "We're On Fire" GPIO */
 		if (palReadPad(GPIOA, PA0)) {
 			pmb_power_off();
 			chg_set(driver, 0, 0, 0);
