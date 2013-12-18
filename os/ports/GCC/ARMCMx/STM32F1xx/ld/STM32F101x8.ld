@@ -82,9 +82,6 @@ SECTIONS
         *(.note*)
     } > flash
 
-    /* ld.bfd will segfault without this */
-    .rel.plt : { . = .; } > flash
-
     .ARM.extab :
     {
         *(.ARM.extab* .gnu.linkonce.armextab.*)
@@ -154,6 +151,10 @@ SECTIONS
         . = ALIGN(4);
         PROVIDE(_bss_end = .);
     } > ram    
+
+    /* ld.bfd will segfault without this */
+    .rel.plt : ALIGN(16) SUBALIGN(16) { . = .; } > flash
+    .got.plt : ALIGN(16) SUBALIGN(16) { . = .; } > flash
 }
 
 PROVIDE(end = .);
