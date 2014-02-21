@@ -218,9 +218,9 @@
         | PIN_OSPEED_2M(PA12) \
         | PIN_OTYPE_PUSHPULL(PA12) \
         \
-        /* JTMS-SWDIO */ \
-        | PIN_OTYPE_PUSHPULL(PA13) \
-        | PIN_OSPEED_2M(PA13) \
+        /* CHG_PWRSWITCH2 (formerly JTMS-SWDIO) */ \
+        | PIN_OSPEED_INPUT(PA13) \
+        | PIN_MODE_FLOATING(PA13) \
         \
         /* JTCK / SWCLK */ \
         | PIN_OSPEED_INPUT(PA14) \
@@ -300,7 +300,8 @@
 
 /* master power (PB15) on */
 /* Pull alert (PB15) high */
-#define VAL_GPIOB_ODR ((1U << 15) | (1U << 12))
+/* Pull CHG_PWRSWITCH_EXT (PB3) high */
+#define VAL_GPIOB_ODR ((1U << 15) | (1U << 12) | (1U << 3))
 
 #define VAL_GPIOC_CRL   ( 0 \
         | PIN_NOTPRESENT(PC0) \

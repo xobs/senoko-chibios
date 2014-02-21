@@ -500,15 +500,29 @@ static void cmd_gg(BaseSequentialStream *chp, int argc, char **argv) {
 			return;
 		}
 	}
-	else if (argc > 0 && !_strcasecmp(argv[0], "capacity")) {
+	else if (argc > 0 && !_strcasecmp(argv[0], "setup")) {
 		uint16_t capacity;
 		int cells;
+
 		if (argc != 3) {
-			chprintf(chp, "Usage: gg capacity [cells] [capacity in mAh]\r\n");
+			chprintf(chp, "Usage: gg setup [cells] [capacity in mAh]\r\n");
 			return;
 		}
 		cells = _strtoul(argv[1], NULL, 0);
 		capacity = _strtoul(argv[2], NULL, 0);
+
+		if (cells != 3 && cells != 4) {
+			chprintf(chp, "Error: Only support 3 or 4 cells\r\n");
+			return;
+		}
+
+		chprintf(chp, "Setting cell count... ");
+		ret = gg_setcells(I2C_BUS, cells);
+		if (ret < 0)
+			chprintf(chp, "Unable to set %d cells: 0x%x\r\n",
+					cells, ret);
+		else
+			chprintf(chp, "Set %d-cell mode\r\n", cells);
 
 		chprintf(chp, "Setting capacity... ");
 		ret = gg_setcapacity(I2C_BUS, cells, capacity);
@@ -518,37 +532,12 @@ static void cmd_gg(BaseSequentialStream *chp, int argc, char **argv) {
 			chprintf(chp, "Set capacity of %d cells to %d mAh\r\n",
 					cells, capacity);
 	}
-	else if (argc > 0 && !_strcasecmp(argv[0], "cells")) {
-		if (argc == 1) {
-			chprintf(chp, "Usage: gg cells [3/4]\r\n");
-		}
-		else {
-			if (argv[1][0] == '3') {
-				ret = gg_setcells(I2C_BUS, 3);
-				if (ret < 0)
-					chprintf(chp, "Unable to set 3 cells: 0x%x\r\n", ret);
-				else
-					chprintf(chp, "Set 3-cell mode\r\n");
-			}
-			else if (argv[1][0] == '4') {
-				ret = gg_setcells(I2C_BUS, 4);
-				if (ret < 0)
-					chprintf(chp, "Unable to set 4 cells: 0x%x\r\n", ret);
-				else
-					chprintf(chp, "Set 4-cell mode\r\n");
-			}
-			else {
-				chprintf(chp, "Unknown cell count: %c\r\n",
-						argv[1][0]);
-			}
-		}
-	}
 	else {
 		chprintf(chp,
 			"Usage:\r\n"
-			"gg dsg +/-       Force dsg fet on or off\r\n"
-			"gg cells [3/4]   Set cell count\r\n"
-			"gg cal           Calibrate battery pack\r\n"
+			"gg dsg +/-            Force dsg fet on or off\r\n"
+			"gg setup [3/4] [mAh]  Set up charger with [3/4] cells and a capacity of [mAh]\r\n"
+			"gg cal                Calibrate battery pack\r\n"
 			);
 		return;
 	}
@@ -697,20 +686,35 @@ static void cmd_chg(BaseSequentialStream *chp, int argc, char **argv) {
 static VirtualTimer vt;
 static void callTogglePower(void *arg)
 {
-	(void)arg;
+	expchannel_t channel = ((uint32_t)arg) & 0xffff;
+
+	/* If the button has gone high again, it was a glitch, ignore it */
+	if (channel == 13 && palReadPad(GPIOA, channel))
+		return;
+	if (channel == 14 && palReadPad(GPIOB, channel))
+		return;
+
 	pmb_toggle_power();
 }
 
-static void gpio14_callback(EXTDriver *extp, expchannel_t channel) {
+static void pwr_callback(EXTDriver *extp, expchannel_t channel) {
 	(void)extp;
 	(void)channel;
 	chSysLockFromIsr();
+	uint32_t arg = channel;
+
+	/* PB14 is internal button, PA13 is internal button */
+	if (channel == 14)
+		arg |= (palReadPad(GPIOB, channel) << 16);
+	else if (channel == 13)
+		arg |= (palReadPad(GPIOA, channel) << 16);
+
 	if (!chVTIsArmedI(&vt))
-		chVTSetI(&vt, MS2ST(100), callTogglePower, NULL);
+		chVTSetI(&vt, MS2ST(200), callTogglePower, (void *)arg);
 	chSysUnlockFromIsr();
 }
 
-static const EXTConfig extcfg ={
+static const EXTConfig extcfg = {
 	{
 		{EXT_CH_MODE_DISABLED, NULL},
 		{EXT_CH_MODE_DISABLED, NULL},
@@ -725,10 +729,12 @@ static const EXTConfig extcfg ={
 		{EXT_CH_MODE_DISABLED, NULL},
 		{EXT_CH_MODE_DISABLED, NULL},
 		{EXT_CH_MODE_DISABLED, NULL},
-		{EXT_CH_MODE_DISABLED, NULL},
-		{EXT_CH_MODE_FALLING_EDGE
+		{EXT_CH_MODE_FALLING_EDGE /* PA13 */
 			| EXT_CH_MODE_AUTOSTART
-			| EXT_MODE_GPIOB, gpio14_callback},
+			| EXT_MODE_GPIOA, pwr_callback},
+		{EXT_CH_MODE_FALLING_EDGE /* PB14 */
+			| EXT_CH_MODE_AUTOSTART
+			| EXT_MODE_GPIOB, pwr_callback},
 		{EXT_CH_MODE_DISABLED, NULL}
 	}
 };
@@ -760,7 +766,8 @@ int main(void) {
 
 	sdStart(STREAM_SERIAL, &ser_cfg);
 
-	chprintf(STREAM, "\r\n~Resetting (Ver %d, git version %s)~\r\n", getVer(), gitversion);
+	chprintf(STREAM, "\r\n~Resetting (Ver %d, git version %s)~\r\n",
+			getVer(), gitversion);
 	chThdSleepMilliseconds(10);
 
 	/*

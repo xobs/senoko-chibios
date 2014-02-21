@@ -89,5 +89,7 @@ bool_t mmc_lld_is_write_protected(MMCDriver *mmcp) {
  */
 void boardInit(void) {
 	/* Remap USART3, which allows PB10 and PB11 to act as I2C2 */
-	AFIO->MAPR |= AFIO_MAPR_USART3_REMAP_FULLREMAP;
+	/* Also, disable JTAG, as we remap it for use as a power switch */
+	AFIO->MAPR |= AFIO_MAPR_USART3_REMAP_FULLREMAP
+		    | AFIO_MAPR_SWJ_CFG_DISABLE;
 }

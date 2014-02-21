@@ -33,7 +33,7 @@ static const systime_t tmo   = TIME_INFINITE;
 #define CHARGE_VOLTAGE 12600
 
 /* Rate (in mA) at which the wall can supply current */
-#define CHARGE_WALL_CURRENT 3420
+#define CHARGE_WALL_CURRENT 3750
 
 /* This is the ABSOLUTE MAXIMUM voltage allowed for each cell */
 #define MV_MAX 4200
